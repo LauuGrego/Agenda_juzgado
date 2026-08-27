@@ -5,108 +5,200 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Agenda Juzgado de Paz">
     <title>Agenda Juzgado de Paz</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-    <!-- SECCIÓN: ENCABEZADO -->
-    <header class="app-header py-2 px-3 sticky-top border-bottom">
-        <div class="container-fluid max-w-1300 d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-2">
-                <div class="brand-icon bg-indigo rounded-2 d-flex align-items-center justify-content-center text-white" style="width: 32px; height: 32px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h18"/></svg>
+    <!-- SECCIÓN: ENCABEZADO Y BARRA DE CONTROL FIJA -->
+    <header class="app-header py-2 px-2 px-md-3 sticky-top border-bottom">
+        <div class="container-fluid max-w-1300">
+            
+            <!-- FILA SUPERIOR: MARCA, PESTAÑAS (DESKTOP) Y ACCIONES -->
+            <div class="row align-items-center g-2">
+                <!-- Marca -->
+                <div class="col-auto">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="brand-icon bg-indigo rounded-2 d-flex align-items-center justify-content-center text-white" style="width: 32px; height: 32px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h18"/></svg>
+                        </div>
+                        <h1 class="h6 mb-0 fw-semibold text-primary-custom text-nowrap">Agenda - Juzgado</h1>
+                    </div>
                 </div>
-                <div>
-                    <h1 class="h6 mb-0 fw-semibold text-primary-custom">Agenda - Juzgado</h1>
+
+                <!-- Pestañas Desktop -->
+                <div class="col d-none d-md-block">
+                    <div class="mx-auto" style="max-width: 360px;">
+                        <ul class="nav nav-pills nav-fill segmented-controls p-1 rounded-2 border">
+                            <li class="nav-item">
+                                <button class="nav-link active nav-tab py-1 px-2 small d-flex align-items-center justify-content-center gap-1" data-tab="grid">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                                    <span>Grilla</span>
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link nav-tab py-1 px-2 small d-flex align-items-center justify-content-center gap-1" data-tab="list">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                                    <span>Activos</span>
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button class="nav-link nav-tab py-1 px-2 small d-flex align-items-center justify-content-center gap-1" data-tab="deactivated">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                                    <span>Desactivados</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Botones Herramientas Desktop -->
+                <div class="col-auto d-none d-md-flex gap-1 ms-auto">
+                    <button id="btn-export-backup" class="btn btn-outline-custom btn-sm p-1 px-2 d-flex align-items-center gap-1" title="Exportar Copia de Seguridad">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span class="small">Exportar</span>
+                    </button>
+                    <button id="btn-import-backup" class="btn btn-outline-custom btn-sm p-1 px-2 d-flex align-items-center gap-1" title="Importar Copia de Seguridad">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <span class="small">Importar</span>
+                    </button>
+                    <input type="file" id="import-file-input" accept=".json" style="display: none;">
+
+                    <button id="theme-toggle" class="btn btn-outline-custom btn-sm p-1 px-2 d-flex align-items-center gap-1" title="Cambiar Tema">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                    </button>
+                </div>
+
+                <!-- Botón Menú Hamburguesa Mobile -->
+                <div class="col-auto d-md-none ms-auto">
+                    <button id="btn-mobile-menu" class="btn btn-outline-custom btn-sm p-1.5 px-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobile-menu-offcanvas" aria-controls="mobile-menu-offcanvas" title="Menú Principal">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
                 </div>
             </div>
 
-            <div class="d-flex align-items-center gap-1">
-                <button id="btn-export-backup" class="btn btn-outline-custom btn-sm p-1 px-2 d-flex align-items-center gap-1" title="Exportar Copia de Seguridad">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    <span class="d-none d-sm-inline small">Exportar</span>
-                </button>
-                <button id="btn-import-backup" class="btn btn-outline-custom btn-sm p-1 px-2 d-flex align-items-center gap-1" title="Importar Copia de Seguridad">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <span class="d-none d-sm-inline small">Importar</span>
-                </button>
-                <input type="file" id="import-file-input" accept=".json" style="display: none;">
+            <!-- FILA DE CONTROL DE AGENDA: FECHA, BÚSQUEDA Y BOTÓN NUEVO -->
+            <div class="row align-items-center g-2 mt-1 pt-2 border-top border-secondary-subtle border-opacity-25">
+                <!-- Navegación de Fecha + Botón Nuevo (Mobile) -->
+                <div class="col-12 col-md-auto">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <div class="d-flex align-items-center gap-1">
+                            <button id="btn-prev-day" class="btn btn-outline-custom btn-sm p-1 px-2" title="Día Anterior">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="15 18 9 12 15 6"/></svg>
+                            </button>
+                            <input type="date" id="selected-date" class="form-control form-control-sm font-mono input-custom p-1 text-center" style="min-width: 130px; width: 135px;">
+                            <button id="btn-next-day" class="btn btn-outline-custom btn-sm p-1 px-2" title="Día Siguiente">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"/></svg>
+                            </button>
+                            <button id="btn-today" class="btn btn-outline-custom btn-sm py-1 px-2">Hoy</button>
+                        </div>
+                        <div id="current-date-header" class="fw-semibold text-primary-custom small text-capitalize text-truncate d-none d-lg-block"></div>
+                        
+                        <!-- Botón Nuevo en Mobile -->
+                        <div class="d-md-none ms-auto">
+                            <button id="btn-new-commitment-mobile" class="btn btn-indigo btn-sm d-flex align-items-center gap-1 text-white text-nowrap px-2.5" onclick="document.getElementById('btn-new-commitment').click()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                <span>Nuevo</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
-                <button id="theme-toggle" class="btn btn-outline-custom btn-sm p-1 px-2 d-flex align-items-center gap-1" title="Cambiar Tema">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                </button>
+                <!-- Búsqueda y Botón Nuevo (Desktop) -->
+                <div class="col-12 col-md">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="input-group input-group-sm flex-grow-1">
+                            <span class="input-group-text input-group-icon px-2">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            </span>
+                            <input type="text" id="search-input" class="form-control input-custom" placeholder="Buscar compromiso...">
+                            <span id="search-count" class="input-group-text font-mono small text-secondary-custom d-none px-2" style="font-size: 0.75rem;"></span>
+                            <button id="btn-search-prev" type="button" class="btn btn-outline-custom p-1 px-1.5 d-none" title="Anterior (Shift+Enter)">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+                            </button>
+                            <button id="btn-search-next" type="button" class="btn btn-outline-custom p-1 px-1.5 d-none" title="Siguiente (Enter)">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                            <button id="btn-search-clear" type="button" class="btn btn-outline-custom p-1 px-1.5 d-none" title="Limpiar búsqueda (Esc)">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                        </div>
+
+                        <!-- Botón Nuevo (Desktop) -->
+                        <button id="btn-new-commitment" class="btn btn-indigo btn-sm d-none d-md-flex align-items-center gap-1 text-white text-nowrap px-3">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            <span>Nuevo</span>
+                        </button>
+                    </div>
+                </div>
             </div>
+
         </div>
     </header>
 
-    <!-- SECCIÓN: CONTENEDOR PRINCIPAL -->
+    <!-- MENÚ HAMBURGUESA DESPLEGABLE (OFFCANVAS MOBILE) -->
+    <div class="offcanvas offcanvas-end bg-surface modal-custom" tabindex="-1" id="mobile-menu-offcanvas" aria-labelledby="mobileMenuLabel" style="max-width: 300px; border-left: 1px solid var(--border-custom);">
+        <div class="offcanvas-header border-bottom py-3">
+            <div class="d-flex align-items-center gap-2">
+                <div class="brand-icon bg-indigo rounded-2 d-flex align-items-center justify-content-center text-white" style="width: 28px; height: 28px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h18"/></svg>
+                </div>
+                <h5 class="offcanvas-title h6 fw-semibold text-primary-custom mb-0" id="mobileMenuLabel">Menú de Agenda</h5>
+            </div>
+            <button type="button" class="btn-close btn-close-custom" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        
+        <div class="offcanvas-body d-flex flex-column gap-3 p-3">
+            <div>
+                <span class="text-secondary-custom font-mono text-uppercase small d-block mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Vistas de Agenda</span>
+                <div class="d-flex flex-column gap-1">
+                    <button class="btn btn-outline-custom text-start d-flex align-items-center gap-2 py-2 px-3 nav-tab w-100 rounded-2 active" data-tab="grid" data-bs-dismiss="offcanvas">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                        <span>Grilla de Tiempo</span>
+                    </button>
+                    <button class="btn btn-outline-custom text-start d-flex align-items-center gap-2 py-2 px-3 nav-tab w-100 rounded-2" data-tab="list" data-bs-dismiss="offcanvas">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                        <span>Compromisos Activos</span>
+                    </button>
+                    <button class="btn btn-outline-custom text-start d-flex align-items-center gap-2 py-2 px-3 nav-tab w-100 rounded-2" data-tab="deactivated" data-bs-dismiss="offcanvas">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                        <span>Historial Desactivados</span>
+                    </button>
+                </div>
+            </div>
+
+            <hr class="my-1 border-secondary-subtle opacity-25">
+
+            <div>
+                <span class="text-secondary-custom font-mono text-uppercase small d-block mb-2" style="font-size: 0.7rem; letter-spacing: 0.05em;">Herramientas</span>
+                <div class="d-flex flex-column gap-1">
+                    <button id="btn-mobile-export" class="btn btn-outline-custom text-start d-flex align-items-center gap-2 py-2 px-3 w-100 rounded-2" data-bs-dismiss="offcanvas">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span>Exportar Copia de Seguridad</span>
+                    </button>
+                    <button id="btn-mobile-import" class="btn btn-outline-custom text-start d-flex align-items-center gap-2 py-2 px-3 w-100 rounded-2" data-bs-dismiss="offcanvas">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <span>Importar Copia de Seguridad</span>
+                    </button>
+                    <button id="mobile-theme-toggle" class="btn btn-outline-custom text-start d-flex align-items-center gap-2 py-2 px-3 w-100 rounded-2" data-bs-dismiss="offcanvas">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                        <span>Cambiar Tema</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENEDOR PRINCIPAL -->
     <main class="container-fluid max-w-1300 py-2 px-2 px-sm-3">
-
-        <!-- BARRA DE HERRAMIENTAS -->
-        <section class="card-toolbar p-2 p-sm-3 mb-3 rounded-3 border">
-            
-            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                <div class="d-flex align-items-center gap-1">
-                    <button id="btn-prev-day" class="btn btn-outline-custom btn-sm p-1 px-2" title="Día Anterior">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="15 18 9 12 15 6"/></svg>
-                    </button>
-                    <input type="date" id="selected-date" class="form-control form-control-sm font-mono input-custom p-1 text-center" style="width: 130px;">
-                    <button id="btn-next-day" class="btn btn-outline-custom btn-sm p-1 px-2" title="Día Siguiente">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
-                    <button id="btn-today" class="btn btn-outline-custom btn-sm py-1 px-2">Hoy</button>
-                </div>
-                <div id="current-date-header" class="fw-semibold text-primary-custom small text-capitalize text-truncate" style="max-width: 100%;"></div>
-            </div>
-
-            <div class="mb-2">
-                <ul class="nav nav-pills nav-fill segmented-controls p-1 rounded-2 border w-100">
-                    <li class="nav-item">
-                        <button class="nav-link active nav-tab py-1 px-2 small d-flex align-items-center justify-content-center gap-1" data-tab="grid">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                            <span>Grilla</span>
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link nav-tab py-1 px-2 small d-flex align-items-center justify-content-center gap-1" data-tab="list">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                            <span>Activos</span>
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link nav-tab py-1 px-2 small d-flex align-items-center justify-content-center gap-1" data-tab="deactivated">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-                            <span>Desactivados</span>
-                        </button>
-                    </li>
-                </ul>
-            </div>
-
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text input-group-icon px-2">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        </span>
-                        <input type="text" id="search-input" class="form-control input-custom" placeholder="Buscar">
-                    </div>
-                </div>
-                <div class="col-auto">
-                    <button id="btn-new-commitment" class="btn btn-indigo btn-sm d-flex align-items-center gap-1 text-white text-nowrap px-3">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        <span>Nuevo</span>
-                    </button>
-                </div>
-            </div>
-        </section>
 
         <!-- VISTA DE GRILLA -->
         <section id="agenda-grid-container"></section>
 
     </main>
 
-    <!-- SECCIÓN: MODAL DE FORMULARIO -->
+    <!-- MODAL DE FORMULARIO -->
     <div id="commitment-modal" class="modal fade" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content modal-custom rounded-3">
@@ -166,7 +258,7 @@
         </div>
     </div>
 
-    <!-- SECCIÓN: MODAL DE DETALLE -->
+    <!-- MODAL DE DETALLE -->
     <div id="detail-modal" class="modal fade" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content modal-custom rounded-3">
@@ -184,7 +276,7 @@
         </div>
     </div>
 
-    <!-- SECCIÓN: MODAL OPCIONES DE IMPORTACIÓN -->
+    <!-- MODAL OPCIONES DE IMPORTACIÓN -->
     <div id="import-modal" class="modal fade" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content modal-custom rounded-3">
@@ -222,8 +314,35 @@
         </div>
     </div>
 
-    <!-- SECCIÓN: NOTIFICACIONES -->
-    <div id="toast-container" class="toast-container position-fixed bottom-0 start-50 translate-middle-x p-3" style="z-index: 2000;"></div>
+    <!-- MODAL DE ADVERTENCIA DE CONFLICTOS -->
+    <div id="conflicts-modal" class="modal fade" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content modal-custom rounded-3 border-danger-subtle">
+                <div class="modal-header border-bottom border-danger-subtle">
+                    <div class="d-flex align-items-center gap-2">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <h5 class="modal-title h6 fw-semibold text-rose-400 mb-0">¡Atención! Conflictos de Horario Detectados</h5>
+                    </div>
+                    <button type="button" class="btn-close btn-close-custom btn-close-modal" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                
+                <div class="modal-body p-3">
+                    <p class="small text-secondary-custom mb-3">
+                        Los siguientes compromisos del archivo importado se agregaron a la agenda, pero <strong class="text-light">se superponen en horario</strong> con actos que ya tenías programados:
+                    </p>
+                    
+                    <div id="conflicts-list-container" class="d-flex flex-column gap-2 mb-2"></div>
+                </div>
+
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-indigo btn-sm text-white btn-close-modal px-4" data-bs-dismiss="modal">Entendido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICACIONES TOAST MEJORADAS -->
+    <div id="toast-container" class="toast-container-custom"></div>
 
     <!-- SCRIPTS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

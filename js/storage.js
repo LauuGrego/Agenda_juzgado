@@ -1,4 +1,4 @@
-// --- SECCIÓN: PERSISTENCIA EN LOCALSTORAGE --- //
+// --- PERSISTENCIA EN LOCALSTORAGE --- //
 
 const Storage = {
     STORAGE_KEY: 'AGENDA_JUZGADO_DATA_V1',
@@ -160,33 +160,44 @@ const Storage = {
             return { success: false, error: 'Datos no válidos para importar.' };
         }
 
+        let finalList = [];
+        let addedCount = 0;
+        let updatedCount = 0;
+
         if (mode === 'replace') {
-            this.saveAll(validItems);
-            return { success: true, mode: 'replace', count: validItems.length, conflicts: [] };
+            finalList = [...validItems];
+            addedCount = validItems.length;
+        } else {
+            // Modo 'merge' (Combinar)
+            const currentItems = this.getAll();
+            finalList = [...currentItems];
+
+            validItems.forEach(item => {
+                const existingIndex = finalList.findIndex(c => c.id === item.id);
+                if (existingIndex !== -1) {
+                    finalList[existingIndex] = { ...finalList[existingIndex], ...item };
+                    updatedCount++;
+                } else {
+                    finalList.push(item);
+                    addedCount++;
+                }
+            });
         }
 
-        // Modo 'merge' (Combinar)
-        const currentItems = this.getAll();
-        const merged = [...currentItems];
-        const conflicts = [];
-        let addedCount = 0;
+        this.saveAll(finalList);
 
-        validItems.forEach(item => {
-            const existingById = merged.find(c => c.id === item.id);
-            if (!existingById) {
-                if (item.active && typeof AgendaLogic !== 'undefined') {
-                    const conflict = AgendaLogic.findOverlapConflict(item, merged);
-                    if (conflict) {
-                        conflicts.push({ imported: item, existing: conflict });
-                    }
-                }
-                merged.push(item);
-                addedCount++;
-            }
-        });
+        const conflicts = typeof AgendaLogic !== 'undefined' && AgendaLogic.detectAllConflicts
+            ? AgendaLogic.detectAllConflicts(finalList)
+            : [];
 
-        this.saveAll(merged);
-        return { success: true, mode: 'merge', count: addedCount, conflicts };
+        return { 
+            success: true, 
+            mode: mode, 
+            count: validItems.length, 
+            added: addedCount, 
+            updated: updatedCount, 
+            conflicts: conflicts 
+        };
     }
 };
 

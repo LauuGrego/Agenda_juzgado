@@ -1,9 +1,130 @@
-// --- SECCIÓN: MOTOR DE INTERFAZ Y RENDERIZADO --- //
+// --- MOTOR DE INTERFAZ Y RENDERIZADO --- //
 
 const UI = {
-    currentDate: AgendaLogic.getLocalDateString(),
+    currentDate: AgendaLogic.getInitialDate(),
     currentTab: 'grid',
     editingId: null,
+
+    searchState: {
+        query: '',
+        matches: [],
+        currentIndex: -1
+    },
+
+    updateSearch(queryRaw) {
+        const query = (queryRaw || '').toLowerCase().trim();
+        const countEl = document.getElementById('search-count');
+        const prevBtn = document.getElementById('btn-search-prev');
+        const nextBtn = document.getElementById('btn-search-next');
+        const clearBtn = document.getElementById('btn-search-clear');
+
+        if (!query) {
+            this.searchState = { query: '', matches: [], currentIndex: -1 };
+            if (countEl) countEl.classList.add('d-none');
+            if (prevBtn) prevBtn.classList.add('d-none');
+            if (nextBtn) nextBtn.classList.add('d-none');
+            if (clearBtn) clearBtn.classList.add('d-none');
+            if (typeof App !== 'undefined') App.renderCurrent();
+            return;
+        }
+
+        if (clearBtn) clearBtn.classList.remove('d-none');
+
+        const allCommitments = typeof Storage !== 'undefined' ? Storage.getAll() : [];
+        const isDeactivatedTab = (this.currentTab === 'deactivated');
+        
+        const filteredCommitments = allCommitments.filter(item => isDeactivatedTab ? !item.active : item.active);
+
+        const matches = filteredCommitments.filter(item => {
+            return (
+                (item.title && item.title.toLowerCase().includes(query)) ||
+                (item.notes && item.notes.toLowerCase().includes(query)) ||
+                (item.priority && item.priority.toLowerCase().includes(query)) ||
+                (item.date && item.date.includes(query))
+            );
+        }).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+
+        this.searchState.query = query;
+        this.searchState.matches = matches;
+
+        if (matches.length === 0) {
+            this.searchState.currentIndex = -1;
+            if (countEl) {
+                countEl.textContent = '0 de 0';
+                countEl.classList.remove('d-none');
+            }
+            if (prevBtn) prevBtn.classList.add('d-none');
+            if (nextBtn) nextBtn.classList.add('d-none');
+        } else {
+            if (this.searchState.currentIndex < 0 || this.searchState.currentIndex >= matches.length) {
+                this.searchState.currentIndex = 0;
+            }
+
+            const activeMatch = matches[this.searchState.currentIndex];
+            if (this.currentTab === 'grid' && activeMatch && activeMatch.date !== this.currentDate) {
+                this.currentDate = activeMatch.date;
+                this.updateDateDisplay();
+            }
+
+            const currentDisplay = this.searchState.currentIndex + 1;
+            if (countEl) {
+                countEl.textContent = `${currentDisplay} de ${matches.length}`;
+                countEl.classList.remove('d-none');
+            }
+            if (prevBtn) prevBtn.classList.remove('d-none');
+            if (nextBtn) nextBtn.classList.remove('d-none');
+        }
+
+        if (typeof App !== 'undefined') App.renderCurrent();
+        this.scrollToActiveMatch();
+    },
+
+    navigateSearch(direction) {
+        const matches = this.searchState.matches;
+        if (!matches || matches.length === 0) return;
+
+        let newIndex = this.searchState.currentIndex + direction;
+        if (newIndex >= matches.length) newIndex = 0;
+        if (newIndex < 0) newIndex = matches.length - 1;
+
+        this.searchState.currentIndex = newIndex;
+        const targetItem = matches[newIndex];
+
+        const countEl = document.getElementById('search-count');
+        if (countEl) {
+            countEl.textContent = `${newIndex + 1} de ${matches.length}`;
+        }
+
+        if (this.currentTab === 'grid' && targetItem.date !== this.currentDate) {
+            this.currentDate = targetItem.date;
+            this.updateDateDisplay();
+        }
+
+        if (typeof App !== 'undefined') App.renderCurrent();
+        this.scrollToActiveMatch();
+    },
+
+    clearSearch() {
+        const input = document.getElementById('search-input');
+        if (input) input.value = '';
+        this.updateSearch('');
+    },
+
+    scrollToActiveMatch() {
+        setTimeout(() => {
+            const matches = this.searchState.matches;
+            const idx = this.searchState.currentIndex;
+            if (!matches || idx < 0 || idx >= matches.length) return;
+
+            const targetItem = matches[idx];
+            const activeCard = document.querySelector(`.commitment-card[onclick*="${targetItem.id}"]`) ||
+                               document.querySelector(`tr[onclick*="${targetItem.id}"]`);
+
+            if (activeCard) {
+                activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+    },
 
     init() {
         this.updateDateDisplay();
@@ -66,6 +187,8 @@ const UI = {
         const container = document.getElementById('agenda-grid-container');
         if (!container) return;
 
+        const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+
         const slots = AgendaLogic.getTimeSlots();
         const rowSlots = slots.slice(0, -1);
         const activeToday = commitments.filter(item => item.active && item.date === this.currentDate);
@@ -82,9 +205,11 @@ const UI = {
 
             if (currentMins >= startMins && currentMins <= endMins) {
                 const elapsedRatio = (currentMins - startMins) / (endMins - startMins);
-                currentTimeIndicatorTop = 38 + Math.round(elapsedRatio * (12 * 60));
+                currentTimeIndicatorTop = Math.round(elapsedRatio * 720);
             }
         }
+
+        const positionedEvents = AgendaLogic.calculateLayoutPositions(activeToday);
 
         let html = `
             <div class="grid-table">
@@ -92,16 +217,25 @@ const UI = {
                     <div class="grid-time-col-header">Horario</div>
                     <div class="grid-slot-col-header text-truncate">Agenda (${this.currentDate})</div>
                 </div>
-                <div class="grid-body">
+                <div class="grid-body position-relative">
         `;
 
         if (currentTimeIndicatorTop !== null) {
             html += `<div class="current-time-indicator" style="top: ${currentTimeIndicatorTop}px;" title="Hora Actual"></div>`;
         }
 
-        rowSlots.forEach((slotTime, index) => {
-            const nextSlotTime = slots[index + 1];
-            const startingItems = activeToday.filter(item => item.startTime === slotTime);
+        rowSlots.forEach((slotTime) => {
+            const [h, m] = slotTime.split(':').map(Number);
+            const endH = m === 30 ? (h + 1).toString().padStart(2, '0') : h.toString().padStart(2, '0');
+            const endM = m === 30 ? '00' : '30';
+            const nextSlotTime = `${endH}:${endM}`;
+
+            const slotMins = AgendaLogic.timeToMinutes(slotTime);
+            const isSlotCovered = activeToday.some(item => {
+                const startMins = AgendaLogic.timeToMinutes(item.startTime);
+                const endMins = AgendaLogic.timeToMinutes(item.endTime);
+                return slotMins >= startMins && slotMins < endMins;
+            });
 
             html += `
                 <div class="grid-row" data-slot="${slotTime}">
@@ -109,48 +243,19 @@ const UI = {
                         <span class="time-label">${slotTime}</span>
                         <span class="time-end-sublabel">a ${nextSlotTime}</span>
                     </div>
-                    <div class="grid-content-cell" id="cell-${slotTime.replace(':', '')}">
+                    <div class="grid-content-cell">
             `;
 
-            if (startingItems.length > 0) {
-                startingItems.forEach(item => {
-                    const spanSlots = AgendaLogic.calculateSpanSlots(item.startTime, item.endTime);
-                    const cardHeight = spanSlots * 60 - 8;
-
-                    let prioBadge = '';
-                    if (item.priority === 'Urgente') {
-                        prioBadge = `<span class="badge-custom badge-rose">Urgente</span>`;
-                    } else if (item.priority === 'Alta') {
-                        prioBadge = `<span class="badge-custom badge-amber">Alta</span>`;
-                    }
-
-                    html += `
-                        <div class="commitment-card" 
-                             style="height: ${cardHeight}px;"
-                             onclick="UI.showDetailModal('${item.id}')">
-                            <div class="card-top-bar">
-                                <span class="card-time-badge">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)}</span>
-                                ${prioBadge}
-                            </div>
-                            <div class="card-title">${Security.escapeHTML(item.title)}</div>
-                            
-                            <div class="card-actions-hover" onclick="event.stopPropagation()">
-                                <button class="btn-icon" title="Editar" onclick="UI.openEditModal('${item.id}')">
-                                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                                </button>
-                                <button class="btn-icon btn-icon-danger" title="Desactivar" onclick="UI.confirmDeactivate('${item.id}')">
-                                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-                                </button>
-                            </div>
+            if (!isSlotCovered) {
+                html += `
+                        <div class="empty-slot-trigger" onclick="UI.openCreateModalForSlot('${slotTime}')">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            <span class="text-truncate">Agregar compromiso a las ${slotTime} hs</span>
                         </div>
-                    `;
-                });
+                `;
             } else {
                 html += `
-                    <div class="empty-slot-trigger" onclick="UI.openCreateModalForSlot('${slotTime}')">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        <span class="text-truncate">Agregar acto a las ${slotTime} hs</span>
-                    </div>
+                        <div class="empty-slot-placeholder" onclick="UI.openCreateModalForSlot('${slotTime}')" title="Agregar compromiso a las ${slotTime} hs"></div>
                 `;
             }
 
@@ -160,8 +265,73 @@ const UI = {
             `;
         });
 
+        html += `<div class="grid-events-layer">`;
+
+        positionedEvents.forEach(item => {
+            let prioBadge = '';
+            if (item.priority === 'Urgente') {
+                prioBadge = `<span class="badge-custom badge-rose">Urgente</span>`;
+            } else if (item.priority === 'Alta') {
+                prioBadge = `<span class="badge-custom badge-amber">Alta</span>`;
+            }
+
+            let conflictBadge = '';
+            let cardConflictClass = '';
+            if (item.hasConflict) {
+                cardConflictClass = 'has-conflict';
+                conflictBadge = `<span class="badge-custom badge-rose me-1 font-mono">Conflicto</span>`;
+            }
+
+            let searchClass = '';
+            if (searchQuery) {
+                const activeMatchId = (this.searchState.matches && this.searchState.currentIndex >= 0)
+                    ? this.searchState.matches[this.searchState.currentIndex]?.id
+                    : null;
+
+                const isMatch = (
+                    (item.title && item.title.toLowerCase().includes(searchQuery)) ||
+                    (item.notes && item.notes.toLowerCase().includes(searchQuery)) ||
+                    (item.priority && item.priority.toLowerCase().includes(searchQuery)) ||
+                    (item.date && item.date.includes(searchQuery))
+                );
+
+                if (item.id === activeMatchId) {
+                    searchClass = 'is-active-search-match';
+                } else if (isMatch) {
+                    searchClass = 'is-search-highlight';
+                } else {
+                    searchClass = 'is-dimmed';
+                }
+            }
+
+            html += `
+                <div class="commitment-card ${cardConflictClass} ${searchClass}" 
+                     style="top: ${item.topPx}px; height: ${item.heightPx}px; left: calc(${item.leftPct}% + 4px); width: calc(${item.widthPct}% - 8px);"
+                     onclick="UI.showDetailModal('${item.id}')">
+                    <div class="card-top-bar">
+                        <span class="card-time-badge font-mono">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)}</span>
+                        <div class="d-flex align-items-center gap-1">
+                            ${conflictBadge}
+                            ${prioBadge}
+                        </div>
+                    </div>
+                    <div class="card-title text-truncate">${Security.escapeHTML(item.title)}</div>
+                    
+                    <div class="card-actions-hover" onclick="event.stopPropagation()">
+                        <button class="btn-icon" title="Editar" onclick="UI.openEditModal('${item.id}')">
+                            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                        <button class="btn-icon btn-icon-danger" title="Desactivar" onclick="UI.confirmDeactivate('${item.id}')">
+                            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+
         html += `
                 </div>
+            </div>
             </div>
         `;
 
@@ -177,8 +347,12 @@ const UI = {
 
         const filtered = activeList.filter(item => {
             if (!searchQuery) return true;
-            return item.title.toLowerCase().includes(searchQuery) ||
-                   item.date.includes(searchQuery);
+            return (
+                (item.title && item.title.toLowerCase().includes(searchQuery)) ||
+                (item.notes && item.notes.toLowerCase().includes(searchQuery)) ||
+                (item.priority && item.priority.toLowerCase().includes(searchQuery)) ||
+                (item.date && item.date.includes(searchQuery))
+            );
         });
 
         if (filtered.length === 0) {
@@ -192,28 +366,16 @@ const UI = {
             return;
         }
 
-        let html = `
-            <div class="table-responsive card bg-surface border-secondary-subtle rounded-3">
-                <table class="table table-dark table-hover align-middle mb-0 small">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Horario</th>
-                            <th>Título / Motivo</th>
-                            <th>Prioridad</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
+        const sorted = filtered.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
 
-        filtered.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime)).forEach(item => {
+        // Vista de Tabla (Desktop)
+        let tableRows = sorted.map(item => {
             let prioBadge = `<span class="badge-custom badge-zinc">Normal</span>`;
             if (item.priority === 'Urgente') prioBadge = `<span class="badge-custom badge-rose">Urgente</span>`;
             else if (item.priority === 'Alta') prioBadge = `<span class="badge-custom badge-amber">Alta</span>`;
             else if (item.priority === 'Baja') prioBadge = `<span class="badge-custom badge-zinc">Baja</span>`;
 
-            html += `
+            return `
                 <tr>
                     <td class="font-mono"><strong>${Security.escapeHTML(item.date)}</strong></td>
                     <td><span class="badge-custom badge-indigo font-mono">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)} hs</span></td>
@@ -228,15 +390,61 @@ const UI = {
                     </td>
                 </tr>
             `;
-        });
+        }).join('');
 
-        html += `
+        let desktopHtml = `
+            <div class="d-none d-md-block table-responsive card bg-surface border-secondary-subtle rounded-3">
+                <table class="table table-dark table-hover align-middle mb-0 small">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Horario</th>
+                            <th>Título / Motivo</th>
+                            <th>Prioridad</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
                     </tbody>
                 </table>
             </div>
         `;
 
-        container.innerHTML = html;
+        // Vista de Tarjetas (Mobile)
+        let mobileCards = sorted.map(item => {
+            let prioBadge = `<span class="badge-custom badge-zinc">Normal</span>`;
+            if (item.priority === 'Urgente') prioBadge = `<span class="badge-custom badge-rose">Urgente</span>`;
+            else if (item.priority === 'Alta') prioBadge = `<span class="badge-custom badge-amber">Alta</span>`;
+            else if (item.priority === 'Baja') prioBadge = `<span class="badge-custom badge-zinc">Baja</span>`;
+
+            return `
+                <div class="card bg-surface border-secondary-subtle p-3 rounded-3 shadow-sm mb-2">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <div>
+                            <div class="font-mono text-light fw-bold small">${Security.escapeHTML(item.date)}</div>
+                            <span class="badge-custom badge-indigo font-mono small">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)} hs</span>
+                        </div>
+                        <div>${prioBadge}</div>
+                    </div>
+                    <h4 class="h6 fw-semibold text-primary-custom mb-1">${Security.escapeHTML(item.title)}</h4>
+                    ${item.notes ? `<p class="small text-secondary-custom mb-2 text-truncate">${Security.escapeHTML(item.notes)}</p>` : ''}
+                    <div class="d-flex gap-1 mt-2 pt-2 border-top border-secondary-subtle border-opacity-25">
+                        <button class="btn btn-outline-secondary btn-sm py-1 px-2 flex-grow-1" onclick="UI.showDetailModal('${item.id}')">Detalle</button>
+                        <button class="btn btn-indigo btn-sm py-1 px-2 text-white flex-grow-1" onclick="UI.openEditModal('${item.id}')">Editar</button>
+                        <button class="btn btn-outline-danger btn-sm py-1 px-2 flex-grow-1" onclick="UI.confirmDeactivate('${item.id}')">Desactivar</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        let mobileHtml = `
+            <div class="d-block d-md-none">
+                ${mobileCards}
+            </div>
+        `;
+
+        container.innerHTML = desktopHtml + mobileHtml;
     },
 
     renderDeactivatedList(commitments) {
@@ -248,8 +456,12 @@ const UI = {
 
         const filtered = deactivatedList.filter(item => {
             if (!searchQuery) return true;
-            return item.title.toLowerCase().includes(searchQuery) ||
-                   item.date.includes(searchQuery);
+            return (
+                (item.title && item.title.toLowerCase().includes(searchQuery)) ||
+                (item.notes && item.notes.toLowerCase().includes(searchQuery)) ||
+                (item.priority && item.priority.toLowerCase().includes(searchQuery)) ||
+                (item.date && item.date.includes(searchQuery))
+            );
         });
 
         if (filtered.length === 0) {
@@ -263,27 +475,15 @@ const UI = {
             return;
         }
 
-        let html = `
-            <div class="table-responsive card bg-surface border-secondary-subtle rounded-3">
-                <table class="table table-dark table-hover align-middle mb-0 small opacity-75">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Horario</th>
-                            <th>Título / Motivo</th>
-                            <th>Motivo Desactivación</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
+        const sorted = filtered.sort((a, b) => (b.date + b.startTime).localeCompare(a.date + a.startTime));
 
-        filtered.sort((a, b) => (b.date + b.startTime).localeCompare(a.date + a.startTime)).forEach(item => {
+        // Vista de Tabla (Desktop)
+        let tableRows = sorted.map(item => {
             const isExpired = item.deactivatedReason === 'expired';
             const reasonLabel = isExpired ? 'Vencimiento de horario' : 'Desactivación manual';
             const reasonBadge = isExpired ? `<span class="badge-custom badge-rose">${reasonLabel}</span>` : `<span class="badge-custom badge-amber">${reasonLabel}</span>`;
 
-            html += `
+            return `
                 <tr>
                     <td class="font-mono"><strong>${Security.escapeHTML(item.date)}</strong></td>
                     <td><span class="badge-custom badge-zinc font-mono">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)} hs</span></td>
@@ -298,15 +498,60 @@ const UI = {
                     </td>
                 </tr>
             `;
-        });
+        }).join('');
 
-        html += `
+        let desktopHtml = `
+            <div class="d-none d-md-block table-responsive card bg-surface border-secondary-subtle rounded-3">
+                <table class="table table-dark table-hover align-middle mb-0 small opacity-75">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Horario</th>
+                            <th>Título / Motivo</th>
+                            <th>Motivo Desactivación</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
                     </tbody>
                 </table>
             </div>
         `;
 
-        container.innerHTML = html;
+        // Vista de Tarjetas (Mobile)
+        let mobileCards = sorted.map(item => {
+            const isExpired = item.deactivatedReason === 'expired';
+            const reasonLabel = isExpired ? 'Vencimiento de horario' : 'Desactivación manual';
+            const reasonBadge = isExpired ? `<span class="badge-custom badge-rose">${reasonLabel}</span>` : `<span class="badge-custom badge-amber">${reasonLabel}</span>`;
+
+            return `
+                <div class="card bg-surface border-secondary-subtle p-3 rounded-3 shadow-sm mb-2 opacity-75">
+                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <div>
+                            <div class="font-mono text-light fw-bold small">${Security.escapeHTML(item.date)}</div>
+                            <span class="badge-custom badge-zinc font-mono small">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)} hs</span>
+                        </div>
+                        <div>${reasonBadge}</div>
+                    </div>
+                    <h4 class="h6 fw-semibold text-primary-custom title-inactive mb-1">${Security.escapeHTML(item.title)}</h4>
+                    ${item.notes ? `<p class="small text-secondary-custom mb-2 text-truncate">${Security.escapeHTML(item.notes)}</p>` : ''}
+                    <div class="d-flex gap-1 mt-2 pt-2 border-top border-secondary-subtle border-opacity-25">
+                        <button class="btn btn-outline-secondary btn-sm py-1 px-2 flex-grow-1" onclick="UI.showDetailModal('${item.id}')">Detalle</button>
+                        <button class="btn btn-indigo btn-sm py-1 px-2 text-white flex-grow-1" onclick="UI.openEditModal('${item.id}')">Editar</button>
+                        <button class="btn btn-outline-success btn-sm py-1 px-2 flex-grow-1" onclick="UI.handleReactivate('${item.id}')">Reactivar</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        let mobileHtml = `
+            <div class="d-block d-md-none">
+                ${mobileCards}
+            </div>
+        `;
+
+        container.innerHTML = desktopHtml + mobileHtml;
     },
 
     openCreateModalForSlot(slotTime) {
@@ -418,36 +663,97 @@ const UI = {
         }
     },
 
-    showToast(message, type = 'info') {
+    showToast(message, type = 'info', customTitle = '') {
         const container = document.getElementById('toast-container');
         if (!container) return;
 
         const toastEl = document.createElement('div');
-        toastEl.className = `toast align-items-center text-bg-dark border-secondary-subtle show`;
-        toastEl.setAttribute('role', 'alert');
-        toastEl.setAttribute('aria-live', 'assertive');
-        toastEl.setAttribute('aria-atomic', 'true');
+        
+        let borderClass = 'toast-info';
+        let defaultTitle = 'Información';
+        let iconSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
+        let duration = 5000;
 
-        const iconSvg = type === 'success' 
-            ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`
-            : type === 'error'
-            ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`
-            : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
+        if (type === 'success') {
+            borderClass = 'toast-success';
+            defaultTitle = 'Operación Exitosa';
+            iconSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`;
+        } else if (type === 'error') {
+            borderClass = 'toast-error';
+            defaultTitle = '¡Atención / Conflicto!';
+            iconSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+            duration = 8500;
+        } else if (type === 'warning') {
+            borderClass = 'toast-warning';
+            defaultTitle = 'Advertencia';
+            iconSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+            duration = 7500;
+        }
+
+        const titleText = customTitle || defaultTitle;
+
+        toastEl.className = `custom-toast-item ${borderClass} p-3 mb-2`;
+        toastEl.setAttribute('role', 'alert');
 
         toastEl.innerHTML = `
-            <div class="d-flex">
-                <div class="toast-body d-flex align-items-center gap-2 small">
-                    ${iconSvg} <span>${Security.escapeHTML(message)}</span>
+            <div class="d-flex align-items-start gap-3">
+                <div class="toast-icon-wrapper flex-shrink-0 mt-0.5">
+                    ${iconSvg}
                 </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                <div class="toast-content flex-grow-1">
+                    <div class="fw-semibold text-primary-custom mb-1" style="font-size: 0.9rem;">${Security.escapeHTML(titleText)}</div>
+                    <div class="text-secondary-custom" style="font-size: 0.84rem; line-height: 1.4;">${Security.escapeHTML(message)}</div>
+                </div>
+                <button type="button" class="btn-close btn-close-custom btn-sm ms-2 flex-shrink-0" onclick="this.closest('.custom-toast-item').remove()" aria-label="Close"></button>
             </div>
         `;
 
         container.appendChild(toastEl);
 
         setTimeout(() => {
-            toastEl.remove();
-        }, 4000);
+            if (toastEl.parentNode) {
+                toastEl.classList.add('toast-fade-out');
+                setTimeout(() => toastEl.remove(), 300);
+            }
+        }, duration);
+    },
+
+    showConflictsModal(conflicts) {
+        if (!Array.isArray(conflicts) || conflicts.length === 0) return;
+
+        const listContainer = document.getElementById('conflicts-list-container');
+        if (!listContainer) return;
+
+        let html = '';
+        conflicts.forEach((item, idx) => {
+            const imp = item.imported;
+            const ex = item.existing;
+
+            html += `
+                <div class="p-3 bg-dark rounded-3 border border-danger-subtle">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="badge-custom badge-rose font-mono">Conflicto #${idx + 1} &bull; ${Security.escapeHTML(imp.date)} (${Security.escapeHTML(imp.startTime)} - ${Security.escapeHTML(imp.endTime)} hs)</span>
+                    </div>
+                    <div class="row g-2 small">
+                        <div class="col-12 col-md-6">
+                            <div class="p-2 rounded bg-surface border border-secondary-subtle">
+                                <strong class="d-block text-rose-400 mb-0.5">Acto Importado:</strong>
+                                <span class="text-light fw-medium">${Security.escapeHTML(imp.title)}</span>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="p-2 rounded bg-surface border border-secondary-subtle">
+                                <strong class="d-block text-amber-400 mb-0.5">Ya existente en la agenda:</strong>
+                                <span class="text-light fw-medium">${Security.escapeHTML(ex.title)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        listContainer.innerHTML = html;
+        this.toggleModal('conflicts-modal', true);
     }
 };
 

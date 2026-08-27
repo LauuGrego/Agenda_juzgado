@@ -1,4 +1,4 @@
-// --- SECCIÓN: CONTROLADOR PRINCIPAL --- //
+// --- CONTROLADOR PRINCIPAL --- //
 
 document.addEventListener('DOMContentLoaded', () => {
     App.init();
@@ -49,7 +49,7 @@ const App = {
         });
 
         document.getElementById('btn-today')?.addEventListener('click', () => {
-            UI.currentDate = AgendaLogic.getLocalDateString();
+            UI.currentDate = AgendaLogic.getInitialDate();
             UI.updateDateDisplay();
             this.renderCurrent();
         });
@@ -76,14 +76,46 @@ const App = {
         });
 
         document.querySelectorAll('.btn-close-modal').forEach(btn => {
-            btn.addEventListener('click', () => {
-                UI.toggleModal('commitment-modal', false);
-                UI.toggleModal('detail-modal', false);
+            btn.addEventListener('click', (e) => {
+                const modalEl = e.currentTarget.closest('.modal');
+                if (modalEl && modalEl.id) {
+                    UI.toggleModal(modalEl.id, false);
+                } else {
+                    UI.toggleModal('commitment-modal', false);
+                    UI.toggleModal('detail-modal', false);
+                    UI.toggleModal('import-modal', false);
+                    UI.toggleModal('conflicts-modal', false);
+                }
             });
         });
 
-        document.getElementById('search-input')?.addEventListener('input', () => {
-            this.renderCurrent();
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                UI.updateSearch(e.target.value);
+            });
+
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    UI.navigateSearch(e.shiftKey ? -1 : 1);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    UI.clearSearch();
+                }
+            });
+        }
+
+        document.getElementById('btn-search-prev')?.addEventListener('click', () => {
+            UI.navigateSearch(-1);
+        });
+
+        document.getElementById('btn-search-next')?.addEventListener('click', () => {
+            UI.navigateSearch(1);
+        });
+
+        document.getElementById('btn-search-clear')?.addEventListener('click', () => {
+            UI.clearSearch();
         });
 
         document.getElementById('commitment-form')?.addEventListener('submit', (e) => {
@@ -96,8 +128,21 @@ const App = {
             UI.showToast('Copia de seguridad exportada correctamente.', 'success');
         });
 
+        document.getElementById('btn-mobile-export')?.addEventListener('click', () => {
+            Storage.exportBackup();
+            UI.showToast('Copia de seguridad exportada correctamente.', 'success');
+        });
+
         document.getElementById('btn-import-backup')?.addEventListener('click', () => {
             document.getElementById('import-file-input')?.click();
+        });
+
+        document.getElementById('btn-mobile-import')?.addEventListener('click', () => {
+            document.getElementById('import-file-input')?.click();
+        });
+
+        document.getElementById('mobile-theme-toggle')?.addEventListener('click', () => {
+            document.getElementById('theme-toggle')?.click();
         });
 
         document.getElementById('import-file-input')?.addEventListener('change', (e) => {
@@ -135,14 +180,25 @@ const App = {
 
             if (result.success) {
                 this.renderCurrent();
+                
+                let detailsStr = '';
+                if (result.added > 0 && result.updated > 0) {
+                    detailsStr = `(${result.added} nuevo(s), ${result.updated} actualizado(s))`;
+                } else if (result.added > 0) {
+                    detailsStr = `(${result.added} nuevo(s))`;
+                } else if (result.updated > 0) {
+                    detailsStr = `(${result.updated} actualizado(s))`;
+                }
+
                 if (result.conflicts && result.conflicts.length > 0) {
-                    const firstConf = result.conflicts[0];
                     UI.showToast(
-                        `Se combinaron ${result.count} registro(s). Se detectó conflicto entre "${Security.escapeHTML(firstConf.imported.title)}" y "${Security.escapeHTML(firstConf.existing.title)}" (${firstConf.imported.startTime} hs).`, 
-                        'error'
+                        `Se procesaron ${result.count} registro(s) ${detailsStr}. ⚠️ ATENCIÓN: Se detectaron ${result.conflicts.length} conflicto(s) de horario.`, 
+                        'error',
+                        '¡Conflicto de Horario Detectado!'
                     );
+                    UI.showConflictsModal(result.conflicts);
                 } else {
-                    UI.showToast(`Se combinaron ${result.count} registro(s) correctamente sin conflictos.`, 'success');
+                    UI.showToast(`Se procesaron ${result.count} registro(s) ${detailsStr} correctamente sin conflictos.`, 'success');
                 }
             } else {
                 UI.showToast(`Error al importar: ${result.error}`, 'error');
@@ -158,7 +214,16 @@ const App = {
 
             if (result.success) {
                 this.renderCurrent();
-                UI.showToast(`Se reemplazaron los datos. ${result.count} registro(s) restaurado(s) con éxito.`, 'success');
+                if (result.conflicts && result.conflicts.length > 0) {
+                    UI.showToast(
+                        `Se reemplazaron los datos. ${result.count} registro(s) restaurado(s). ⚠️ ATENCIÓN: Se detectaron ${result.conflicts.length} conflicto(s) de horario.`, 
+                        'error',
+                        '¡Conflicto de Horario Detectado!'
+                    );
+                    UI.showConflictsModal(result.conflicts);
+                } else {
+                    UI.showToast(`Se reemplazaron los datos. ${result.count} registro(s) restaurado(s) con éxito sin conflictos.`, 'success');
+                }
             } else {
                 UI.showToast(`Error al importar: ${result.error}`, 'error');
             }

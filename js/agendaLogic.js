@@ -1,4 +1,4 @@
-// --- SECCIÓN: LÓGICA DE HORARIOS Y COLISIONES --- //
+// --- LÓGICA DE HORARIOS Y COLISIONES --- //
 
 const AgendaLogic = {
     START_HOUR: 7,
@@ -10,6 +10,17 @@ const AgendaLogic = {
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
+    },
+
+    getInitialDate(now = new Date()) {
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        if (hours > this.END_HOUR || (hours === this.END_HOUR && minutes > 0)) {
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return this.getLocalDateString(tomorrow);
+        }
+        return this.getLocalDateString(now);
     },
 
     getTimeSlots() {
@@ -65,6 +76,37 @@ const AgendaLogic = {
         return null;
     },
 
+    detectAllConflicts(commitments) {
+        if (!Array.isArray(commitments)) return [];
+        const activeItems = commitments.filter(c => c && c.active);
+        const conflicts = [];
+        const seenPairs = new Set();
+
+        for (let i = 0; i < activeItems.length; i++) {
+            for (let j = i + 1; j < activeItems.length; j++) {
+                const a = activeItems[i];
+                const b = activeItems[j];
+
+                if (a.date === b.date && a.id !== b.id) {
+                    const aStart = this.timeToMinutes(a.startTime);
+                    const aEnd = this.timeToMinutes(a.endTime);
+                    const bStart = this.timeToMinutes(b.startTime);
+                    const bEnd = this.timeToMinutes(b.endTime);
+
+                    if (aStart < bEnd && aEnd > bStart) {
+                        const pairKey = [a.id, b.id].sort().join('___');
+                        if (!seenPairs.has(pairKey)) {
+                            seenPairs.add(pairKey);
+                            conflicts.push({ imported: b, existing: a });
+                        }
+                    }
+                }
+            }
+        }
+
+        return conflicts;
+    },
+
     evaluateAutomaticDeactivations(commitments, now = new Date()) {
         let countDeactivated = 0;
         const updatedCommitments = commitments.map(item => {
@@ -111,6 +153,94 @@ const AgendaLogic = {
         }
 
         return { canReactivate: true };
+    },
+
+    calculateLayoutPositions(activeToday) {
+        if (!Array.isArray(activeToday) || activeToday.length === 0) return [];
+
+        const items = activeToday.map(evt => {
+            const startMins = this.timeToMinutes(evt.startTime);
+            const endMins = this.timeToMinutes(evt.endTime);
+            return {
+                ...evt,
+                startMins,
+                endMins,
+                duration: endMins - startMins
+            };
+        }).sort((a, b) => a.startMins - b.startMins || b.endMins - a.endMins);
+
+        const clusters = [];
+        let currentCluster = [];
+        let clusterEndMins = -1;
+
+        items.forEach(item => {
+            if (currentCluster.length === 0) {
+                currentCluster.push(item);
+                clusterEndMins = item.endMins;
+            } else {
+                if (item.startMins < clusterEndMins) {
+                    currentCluster.push(item);
+                    if (item.endMins > clusterEndMins) {
+                        clusterEndMins = item.endMins;
+                    }
+                } else {
+                    clusters.push(currentCluster);
+                    currentCluster = [item];
+                    clusterEndMins = item.endMins;
+                }
+            }
+        });
+
+        if (currentCluster.length > 0) {
+            clusters.push(currentCluster);
+        }
+
+        const positionedEvents = [];
+        const startHourMins = this.START_HOUR * 60; // 420 mins (07:00)
+
+        clusters.forEach(cluster => {
+            const columns = [];
+
+            cluster.forEach(item => {
+                let assignedCol = -1;
+                for (let i = 0; i < columns.length; i++) {
+                    if (columns[i] <= item.startMins) {
+                        assignedCol = i;
+                        columns[i] = item.endMins;
+                        break;
+                    }
+                }
+
+                if (assignedCol === -1) {
+                    assignedCol = columns.length;
+                    columns.push(item.endMins);
+                }
+
+                item.colIndex = assignedCol;
+            });
+
+            const totalCols = columns.length;
+            const hasConflict = totalCols > 1;
+
+            cluster.forEach(item => {
+                const topPx = (item.startMins - startHourMins) * 2 + 2; // 2px per minute
+                const heightPx = Math.max(item.duration * 2 - 4, 32);
+
+                const widthPct = 100 / totalCols;
+                const leftPct = item.colIndex * widthPct;
+
+                positionedEvents.push({
+                    ...item,
+                    topPx,
+                    heightPx,
+                    leftPct,
+                    widthPct,
+                    hasConflict
+                });
+            });
+        });
+
+        return positionedEvents;
     }
 };
 

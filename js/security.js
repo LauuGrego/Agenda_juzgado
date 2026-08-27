@@ -1,4 +1,4 @@
-// --- SECCIÓN: SEGURIDAD Y VALIDACIÓN --- //
+// --- SEGURIDAD Y VALIDACIÓN --- //
 
 const Security = {
     escapeHTML(str) {
