@@ -139,6 +139,10 @@ body {
     background-color: var(--bg-surface) !important;
 }
 
+.bg-card-inner {
+    background-color: var(--bg-card-inner) !important;
+}
+
 .bg-indigo {
     background-color: var(--primary-indigo) !important;
 }

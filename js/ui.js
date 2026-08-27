@@ -359,7 +359,7 @@ const UI = {
             container.innerHTML = `
                 <div class="card bg-surface border-secondary-subtle p-4 text-center text-secondary rounded-3">
                     <svg class="mb-2 opacity-50" viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" stroke-width="1.5" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                    <h3 class="h6 text-light mb-1">No hay compromisos activos</h3>
+                    <h3 class="h6 text-primary-custom mb-1">No hay compromisos activos</h3>
                     <p class="small mb-0">No se encontraron compromisos programados que coincidan con la búsqueda.</p>
                 </div>
             `;
@@ -422,7 +422,7 @@ const UI = {
                 <div class="card bg-surface border-secondary-subtle p-3 rounded-3 shadow-sm mb-2">
                     <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                         <div>
-                            <div class="font-mono text-light fw-bold small">${Security.escapeHTML(item.date)}</div>
+                            <div class="font-mono text-primary-custom fw-bold small">${Security.escapeHTML(item.date)}</div>
                             <span class="badge-custom badge-indigo font-mono small">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)} hs</span>
                         </div>
                         <div>${prioBadge}</div>
@@ -468,7 +468,7 @@ const UI = {
             container.innerHTML = `
                 <div class="card bg-surface border-secondary-subtle p-4 text-center text-secondary rounded-3">
                     <svg class="mb-2 opacity-50" viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" stroke-width="1.5" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                    <h3 class="h6 text-light mb-1">No hay registros desactivados</h3>
+                    <h3 class="h6 text-primary-custom mb-1">No hay registros desactivados</h3>
                     <p class="small mb-0">Los compromisos desactivados manualmente o por vencimiento aparecerán aquí.</p>
                 </div>
             `;
@@ -529,7 +529,7 @@ const UI = {
                 <div class="card bg-surface border-secondary-subtle p-3 rounded-3 shadow-sm mb-2 opacity-75">
                     <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                         <div>
-                            <div class="font-mono text-light fw-bold small">${Security.escapeHTML(item.date)}</div>
+                            <div class="font-mono text-primary-custom fw-bold small">${Security.escapeHTML(item.date)}</div>
                             <span class="badge-custom badge-zinc font-mono small">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)} hs</span>
                         </div>
                         <div>${reasonBadge}</div>
@@ -602,18 +602,18 @@ const UI = {
         body.innerHTML = `
             <div class="mb-3">
                 <div class="d-flex align-items-center justify-content-between">
-                    <h4 class="h6 fw-semibold text-light mb-0">${Security.escapeHTML(item.title)}</h4>
+                    <h4 class="h6 fw-semibold text-primary-custom mb-0">${Security.escapeHTML(item.title)}</h4>
                     ${statusBadge}
                 </div>
             </div>
-            <div class="row g-2 p-2 bg-dark rounded border border-secondary-subtle small mb-3">
-                <div class="col-6"><strong>Fecha:</strong> <span class="font-mono text-light">${Security.escapeHTML(item.date)}</span></div>
-                <div class="col-6"><strong>Horario:</strong> <span class="font-mono text-light">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)} hs</span></div>
+            <div class="row g-2 p-2 bg-card-inner rounded border border-secondary-subtle small mb-3">
+                <div class="col-6"><strong>Fecha:</strong> <span class="font-mono text-primary-custom">${Security.escapeHTML(item.date)}</span></div>
+                <div class="col-6"><strong>Horario:</strong> <span class="font-mono text-primary-custom">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)} hs</span></div>
                 <div class="col-12"><strong>Prioridad:</strong> ${Security.escapeHTML(item.priority)}</div>
             </div>
-            <div class="p-2 bg-dark rounded border border-secondary-subtle small">
+            <div class="p-2 bg-card-inner rounded border border-secondary-subtle small">
                 <strong class="d-block mb-1">Observaciones:</strong>
-                <p class="mb-0 text-secondary">${item.notes ? Security.escapeHTML(item.notes) : '<em>Sin observaciones cargadas.</em>'}</p>
+                <p class="mb-0 text-secondary-custom">${item.notes ? Security.escapeHTML(item.notes) : '<em>Sin observaciones cargadas.</em>'}</p>
             </div>
         `;
 
@@ -730,7 +730,7 @@ const UI = {
             const ex = item.existing;
 
             html += `
-                <div class="p-3 bg-dark rounded-3 border border-danger-subtle">
+                <div class="p-3 bg-card-inner rounded-3 border border-danger-subtle">
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <span class="badge-custom badge-rose font-mono">Conflicto #${idx + 1} &bull; ${Security.escapeHTML(imp.date)} (${Security.escapeHTML(imp.startTime)} - ${Security.escapeHTML(imp.endTime)} hs)</span>
                     </div>
@@ -738,13 +738,13 @@ const UI = {
                         <div class="col-12 col-md-6">
                             <div class="p-2 rounded bg-surface border border-secondary-subtle">
                                 <strong class="d-block text-rose-400 mb-0.5">Acto Importado:</strong>
-                                <span class="text-light fw-medium">${Security.escapeHTML(imp.title)}</span>
+                                <span class="text-primary-custom fw-medium">${Security.escapeHTML(imp.title)}</span>
                             </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <div class="p-2 rounded bg-surface border border-secondary-subtle">
                                 <strong class="d-block text-amber-400 mb-0.5">Ya existente en la agenda:</strong>
-                                <span class="text-light fw-medium">${Security.escapeHTML(ex.title)}</span>
+                                <span class="text-primary-custom fw-medium">${Security.escapeHTML(ex.title)}</span>
                             </div>
                         </div>
                     </div>
