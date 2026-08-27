@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 const App = {
+    pendingImportItems: null,
+
     init() {
         UI.init();
         this.bindEvents();
@@ -87,6 +89,79 @@ const App = {
         document.getElementById('commitment-form')?.addEventListener('submit', (e) => {
             e.preventDefault();
             this.handleFormSubmit();
+        });
+
+        document.getElementById('btn-export-backup')?.addEventListener('click', () => {
+            Storage.exportBackup();
+            UI.showToast('Copia de seguridad exportada correctamente.', 'success');
+        });
+
+        document.getElementById('btn-import-backup')?.addEventListener('click', () => {
+            document.getElementById('import-file-input')?.click();
+        });
+
+        document.getElementById('import-file-input')?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const parseResult = Storage.parseBackupData(event.target.result);
+                if (!parseResult.success) {
+                    UI.showToast(`Error al leer archivo: ${parseResult.error}`, 'error');
+                    e.target.value = '';
+                    return;
+                }
+
+                App.pendingImportItems = parseResult.validItems;
+
+                const countBadge = document.getElementById('import-count-badge');
+                if (countBadge) {
+                    countBadge.textContent = parseResult.validItems.length;
+                }
+
+                UI.toggleModal('import-modal', true);
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        });
+
+        document.getElementById('btn-import-merge')?.addEventListener('click', () => {
+            if (!App.pendingImportItems) return;
+            UI.toggleModal('import-modal', false);
+            
+            const result = Storage.importBackup(App.pendingImportItems, 'merge');
+            App.pendingImportItems = null;
+
+            if (result.success) {
+                this.renderCurrent();
+                if (result.conflicts && result.conflicts.length > 0) {
+                    const firstConf = result.conflicts[0];
+                    UI.showToast(
+                        `Se combinaron ${result.count} registro(s). Se detectó conflicto entre "${Security.escapeHTML(firstConf.imported.title)}" y "${Security.escapeHTML(firstConf.existing.title)}" (${firstConf.imported.startTime} hs).`, 
+                        'error'
+                    );
+                } else {
+                    UI.showToast(`Se combinaron ${result.count} registro(s) correctamente sin conflictos.`, 'success');
+                }
+            } else {
+                UI.showToast(`Error al importar: ${result.error}`, 'error');
+            }
+        });
+
+        document.getElementById('btn-import-replace')?.addEventListener('click', () => {
+            if (!App.pendingImportItems) return;
+            UI.toggleModal('import-modal', false);
+
+            const result = Storage.importBackup(App.pendingImportItems, 'replace');
+            App.pendingImportItems = null;
+
+            if (result.success) {
+                this.renderCurrent();
+                UI.showToast(`Se reemplazaron los datos. ${result.count} registro(s) restaurado(s) con éxito.`, 'success');
+            } else {
+                UI.showToast(`Error al importar: ${result.error}`, 'error');
+            }
         });
 
         document.getElementById('theme-toggle')?.addEventListener('click', () => {

@@ -102,6 +102,91 @@ const Storage = {
             typeof item.endTime === 'string' &&
             typeof item.active === 'boolean'
         );
+    },
+
+    exportBackup() {
+        const commitments = this.getAll();
+        const backupObj = {
+            version: '1.0',
+            appName: 'Agenda_juzgado',
+            exportedAt: new Date().toISOString(),
+            count: commitments.length,
+            commitments: commitments
+        };
+
+        const jsonStr = JSON.stringify(backupObj, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const dateStr = typeof AgendaLogic !== 'undefined' && AgendaLogic.getLocalDateString
+            ? AgendaLogic.getLocalDateString()
+            : new Date().toISOString().split('T')[0];
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `agenda_backup_${dateStr}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    },
+
+    parseBackupData(jsonString) {
+        try {
+            const data = JSON.parse(jsonString);
+            let itemsToImport = [];
+
+            if (Array.isArray(data)) {
+                itemsToImport = data;
+            } else if (data && Array.isArray(data.commitments)) {
+                itemsToImport = data.commitments;
+            } else {
+                return { success: false, error: 'Formato de archivo de respaldo no reconocido.' };
+            }
+
+            const validItems = itemsToImport.filter(item => this.isValidCommitmentSchema(item));
+            if (validItems.length === 0 && itemsToImport.length > 0) {
+                return { success: false, error: 'Ningún registro en el archivo posee el formato válido de la agenda.' };
+            }
+
+            return { success: true, validItems };
+        } catch (err) {
+            return { success: false, error: 'El archivo seleccionado no es un JSON válido.' };
+        }
+    },
+
+    importBackup(validItems, mode = 'merge') {
+        if (!Array.isArray(validItems)) {
+            return { success: false, error: 'Datos no válidos para importar.' };
+        }
+
+        if (mode === 'replace') {
+            this.saveAll(validItems);
+            return { success: true, mode: 'replace', count: validItems.length, conflicts: [] };
+        }
+
+        // Modo 'merge' (Combinar)
+        const currentItems = this.getAll();
+        const merged = [...currentItems];
+        const conflicts = [];
+        let addedCount = 0;
+
+        validItems.forEach(item => {
+            const existingById = merged.find(c => c.id === item.id);
+            if (!existingById) {
+                if (item.active && typeof AgendaLogic !== 'undefined') {
+                    const conflict = AgendaLogic.findOverlapConflict(item, merged);
+                    if (conflict) {
+                        conflicts.push({ imported: item, existing: conflict });
+                    }
+                }
+                merged.push(item);
+                addedCount++;
+            }
+        });
+
+        this.saveAll(merged);
+        return { success: true, mode: 'merge', count: addedCount, conflicts };
     }
 };
 
