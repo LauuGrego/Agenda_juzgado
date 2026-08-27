@@ -33,7 +33,7 @@ const App = {
         document.getElementById('btn-prev-day')?.addEventListener('click', () => {
             const [y, m, d] = UI.currentDate.split('-').map(Number);
             const dt = new Date(y, m - 1, d - 1);
-            UI.currentDate = dt.toISOString().split('T')[0];
+            UI.currentDate = AgendaLogic.getLocalDateString(dt);
             UI.updateDateDisplay();
             this.renderCurrent();
         });
@@ -41,13 +41,13 @@ const App = {
         document.getElementById('btn-next-day')?.addEventListener('click', () => {
             const [y, m, d] = UI.currentDate.split('-').map(Number);
             const dt = new Date(y, m - 1, d + 1);
-            UI.currentDate = dt.toISOString().split('T')[0];
+            UI.currentDate = AgendaLogic.getLocalDateString(dt);
             UI.updateDateDisplay();
             this.renderCurrent();
         });
 
         document.getElementById('btn-today')?.addEventListener('click', () => {
-            UI.currentDate = new Date().toISOString().split('T')[0];
+            UI.currentDate = AgendaLogic.getLocalDateString();
             UI.updateDateDisplay();
             this.renderCurrent();
         });

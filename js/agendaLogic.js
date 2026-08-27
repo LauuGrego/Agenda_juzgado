@@ -5,6 +5,13 @@ const AgendaLogic = {
     END_HOUR: 13,
     SLOT_INTERVAL_MINS: 30,
 
+    getLocalDateString(d = new Date()) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    },
+
     getTimeSlots() {
         const slots = [];
         let totalMinutes = this.START_HOUR * 60;

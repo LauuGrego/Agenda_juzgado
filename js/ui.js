@@ -1,7 +1,7 @@
 // --- SECCIÓN: MOTOR DE INTERFAZ Y RENDERIZADO --- //
 
 const UI = {
-    currentDate: new Date().toISOString().split('T')[0],
+    currentDate: AgendaLogic.getLocalDateString(),
     currentTab: 'grid',
     editingId: null,
 
@@ -71,7 +71,7 @@ const UI = {
         const activeToday = commitments.filter(item => item.active && item.date === this.currentDate);
 
         const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
+        const todayStr = AgendaLogic.getLocalDateString(now);
         const isToday = (this.currentDate === todayStr);
 
         let currentTimeIndicatorTop = null;
