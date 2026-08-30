@@ -14,8 +14,10 @@
     "test": "node test_suite.js",
     "db:local:up": "docker compose up -d",
     "db:local:down": "docker compose down",
+    "db:backup": "node sync_backup.js",
     "use:local": "node -e \"require('fs').copyFileSync('.env.local', '.env')\" && prisma db push --skip-generate",
     "use:supabase": "node -e \"require('fs').copyFileSync('.env.supabase', '.env')\" && prisma db push --skip-generate",
+    "use:railway": "node -e \"require('fs').copyFileSync('.env.railway', '.env')\" && prisma db push --skip-generate",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio"

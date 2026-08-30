@@ -1,15 +1,132 @@
 // --- SUITE DE PRUEBAS AUTOMATIZADAS (TEST SUITE) --- //
 
+require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const express = require('express');
+const cors = require('cors');
 
-const BASE_URL = 'http://localhost:3000/api';
+// Configuración de servidor de pruebas integrado
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+app.get('/api/health', async (req, res) => {
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        return res.json({ status: 'ok', connected: true });
+    } catch (error) {
+        return res.status(503).json({ status: 'error', connected: false, error: error.message });
+    }
+});
+
+app.get('/api/commitments', async (req, res) => {
+    try {
+        const commitments = await prisma.commitment.findMany({
+            orderBy: [{ date: 'asc' }, { startTime: 'asc' }]
+        });
+        return res.json(commitments);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/commitments', async (req, res) => {
+    try {
+        const { id, title, date, startTime, endTime, priority, notes } = req.body;
+        const created = await prisma.commitment.create({
+            data: { id: id || undefined, title, date, startTime, endTime, priority: priority || 'Media', notes: notes || '', active: true }
+        });
+        return res.status(201).json(created);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/commitments/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const updated = await prisma.commitment.update({
+            where: { id },
+            data: req.body
+        });
+        return res.json(updated);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+app.patch('/api/commitments/:id/deactivate', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deactivated = await prisma.commitment.update({
+            where: { id },
+            data: { active: false, deactivatedReason: req.body.reason || 'manual', deactivatedAt: new Date() }
+        });
+        return res.json(deactivated);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+app.patch('/api/commitments/:id/reactivate', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const reactivated = await prisma.commitment.update({
+            where: { id },
+            data: { active: true, deactivatedReason: null, deactivatedAt: null }
+        });
+        return res.json(reactivated);
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/commitments/sync-expired', async (req, res) => {
+    try {
+        const { expiredIds } = req.body;
+        const result = await prisma.commitment.updateMany({
+            where: { id: { in: expiredIds }, active: true },
+            data: { active: false, deactivatedReason: 'expired', deactivatedAt: new Date() }
+        });
+        return res.json({ updated: result.count });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/commitments/import', async (req, res) => {
+    const { items, mode = 'merge' } = req.body;
+    try {
+        let added = 0;
+        let updated = 0;
+        await prisma.$transaction(async (tx) => {
+            for (const item of items) {
+                const existing = await tx.commitment.findUnique({ where: { id: item.id } });
+                if (existing) {
+                    await tx.commitment.update({ where: { id: item.id }, data: item });
+                    updated++;
+                } else {
+                    await tx.commitment.create({ data: item });
+                    added++;
+                }
+            }
+        });
+        return res.json({ success: true, count: items.length, added, updated });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+const TEST_PORT = 3199;
+const BASE_URL = `http://localhost:${TEST_PORT}/api`;
 
 async function runTests() {
     console.log('====================================================');
     console.log('🧪 INICIANDO BATERÍA DE PRUEBAS: AGENDA JUZGADO');
     console.log('====================================================\n');
 
+    const server = app.listen(TEST_PORT);
     let passed = 0;
     let failed = 0;
 
@@ -25,7 +142,6 @@ async function runTests() {
         }
     }
 
-    // Identificador único para las pruebas de hoy
     const testId = `test-${Date.now()}`;
     const testDate = '2026-09-01';
 
@@ -220,6 +336,7 @@ async function runTests() {
         console.warn('  ⚠️ Aviso en limpieza:', cleanErr.message);
     }
 
+    server.close();
     await prisma.$disconnect();
 
     console.log('\n====================================================');
