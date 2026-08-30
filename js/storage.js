@@ -1,70 +1,176 @@
-// --- PERSISTENCIA EN LOCALSTORAGE --- //
+// --- PERSISTENCIA HÍBRIDA: SUPABASE / PRISMA ORM + CACHÉ LOCAL --- //
 
 const Storage = {
     STORAGE_KEY: 'AGENDA_JUZGADO_DATA_V1',
+    API_BASE: '/api',
+    _memoryCache: null,
+    isOnline: false,
+    dbStatus: 'checking', // 'checking' | 'connected' | 'offline' | 'syncing'
+    provider: 'supabase', // 'supabase' | 'local-postgres'
+    statusListeners: [],
+
+    onStatusChange(callback) {
+        if (typeof callback === 'function') {
+            this.statusListeners.push(callback);
+            callback(this.dbStatus, this.isOnline, '', this.provider);
+        }
+    },
+
+    notifyStatus(status, isOnline = false, detail = '', provider = null) {
+        this.dbStatus = status;
+        this.isOnline = isOnline;
+        if (provider) this.provider = provider;
+        this.statusListeners.forEach(cb => {
+            try { cb(status, isOnline, detail, this.provider); } catch (e) { console.error(e); }
+        });
+    },
 
     getInitialSeedData() {
         return [];
     },
 
-    getAll() {
+    getLocalData() {
         try {
             const raw = localStorage.getItem(this.STORAGE_KEY);
-            if (!raw) {
-                const empty = this.getInitialSeedData();
-                this.saveAll(empty);
-                return empty;
-            }
+            if (!raw) return [];
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) {
                 return parsed.filter(this.isValidCommitmentSchema);
             }
         } catch (err) {
-            console.error('Error al leer storage:', err);
+            console.error('Error al leer de localStorage:', err);
         }
-        const empty = this.getInitialSeedData();
-        this.saveAll(empty);
-        return empty;
+        return [];
     },
 
-    saveAll(commitments) {
+    saveLocalData(commitments) {
         try {
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(commitments));
         } catch (err) {
-            console.error('Error al escribir storage:', err);
+            console.error('Error al escribir en localStorage:', err);
         }
     },
 
-    add(commitmentData) {
-        const commitments = this.getAll();
+    async init() {
+        this.notifyStatus('checking', false, 'Conectando con la base de datos...');
+        // Carga inicial desde caché local para renderizado instantáneo
+        this._memoryCache = this.getLocalData();
+
+        try {
+            const healthRes = await fetch(`${this.API_BASE}/health`, { method: 'GET' });
+            if (healthRes.ok) {
+                const healthData = await healthRes.json();
+                if (healthData.connected) {
+                    this.provider = healthData.provider || 'supabase';
+                    await this.fetchRemoteData();
+                    const label = this.provider === 'local-postgres' ? 'PostgreSQL Local (Docker)' : 'Supabase (Prisma ORM)';
+                    this.notifyStatus('connected', true, `Conectado a ${label}`, this.provider);
+                    return this._memoryCache;
+                }
+            }
+            this.notifyStatus('offline', false, 'Base de datos no disponible, usando almacenamiento local');
+        } catch (err) {
+            console.warn('Servidor o base de datos no disponible en este momento. Operando en modo local.', err);
+            this.notifyStatus('offline', false, 'Modo local (Sin conexión al servidor)');
+        }
+
+        return this._memoryCache;
+    },
+
+    async fetchRemoteData() {
+        try {
+            this.notifyStatus('syncing', true, 'Sincronizando con Supabase...');
+            const res = await fetch(`${this.API_BASE}/commitments`);
+            if (res.ok) {
+                const remoteCommitments = await res.json();
+                if (Array.isArray(remoteCommitments)) {
+                    this._memoryCache = remoteCommitments.filter(this.isValidCommitmentSchema);
+                    this.saveLocalData(this._memoryCache);
+                    this.notifyStatus('connected', true, 'Base de datos sincronizada', this.provider);
+                    return this._memoryCache;
+                }
+            }
+        } catch (err) {
+            console.error('Error al sincronizar con el servidor:', err);
+            this.notifyStatus('offline', false, 'Error de sincronización con Supabase');
+        }
+        return this._memoryCache;
+    },
+
+    getAll() {
+        if (this._memoryCache === null) {
+            this._memoryCache = this.getLocalData();
+        }
+        return this._memoryCache;
+    },
+
+    saveAll(commitments) {
+        this._memoryCache = [...commitments];
+        this.saveLocalData(this._memoryCache);
+    },
+
+    async add(commitmentData) {
         const newCommitment = {
             ...commitmentData,
-            id: 'cm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+            id: commitmentData.id || ('cm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7)),
             active: true,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
+
+        const commitments = this.getAll();
         commitments.push(newCommitment);
         this.saveAll(commitments);
+
+        if (this.isOnline) {
+            try {
+                const res = await fetch(`${this.API_BASE}/commitments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newCommitment)
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    console.warn('Aviso al guardar en Supabase:', err);
+                }
+            } catch (err) {
+                console.error('Fallo al persistir en Supabase:', err);
+            }
+        }
+
         return newCommitment;
     },
 
-    update(id, updatedData) {
+    async update(id, updatedData) {
         const commitments = this.getAll();
         const index = commitments.findIndex(item => item.id === id);
         if (index === -1) return null;
 
-        commitments[index] = {
+        const updatedCommitment = {
             ...commitments[index],
             ...updatedData,
             updatedAt: new Date().toISOString()
         };
 
+        commitments[index] = updatedCommitment;
         this.saveAll(commitments);
-        return commitments[index];
+
+        if (this.isOnline) {
+            try {
+                await fetch(`${this.API_BASE}/commitments/${encodeURIComponent(id)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedCommitment)
+                });
+            } catch (err) {
+                console.error(`Fallo al actualizar en Supabase id=${id}:`, err);
+            }
+        }
+
+        return updatedCommitment;
     },
 
-    deactivate(id, reason = 'manual') {
+    async deactivate(id, reason = 'manual') {
         const commitments = this.getAll();
         const index = commitments.findIndex(item => item.id === id);
         if (index === -1) return false;
@@ -75,10 +181,23 @@ const Storage = {
         commitments[index].updatedAt = new Date().toISOString();
 
         this.saveAll(commitments);
+
+        if (this.isOnline) {
+            try {
+                await fetch(`${this.API_BASE}/commitments/${encodeURIComponent(id)}/deactivate`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason })
+                });
+            } catch (err) {
+                console.error(`Fallo al desactivar en Supabase id=${id}:`, err);
+            }
+        }
+
         return true;
     },
 
-    reactivate(id) {
+    async reactivate(id) {
         const commitments = this.getAll();
         const index = commitments.findIndex(item => item.id === id);
         if (index === -1) return false;
@@ -89,7 +208,34 @@ const Storage = {
         commitments[index].updatedAt = new Date().toISOString();
 
         this.saveAll(commitments);
+
+        if (this.isOnline) {
+            try {
+                await fetch(`${this.API_BASE}/commitments/${encodeURIComponent(id)}/reactivate`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            } catch (err) {
+                console.error(`Fallo al reactivar en Supabase id=${id}:`, err);
+            }
+        }
+
         return true;
+    },
+
+    async syncExpired(expiredIds) {
+        if (!Array.isArray(expiredIds) || expiredIds.length === 0) return;
+        if (this.isOnline) {
+            try {
+                await fetch(`${this.API_BASE}/commitments/sync-expired`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ expiredIds })
+                });
+            } catch (err) {
+                console.error('Error al sincronizar expirados con Supabase:', err);
+            }
+        }
     },
 
     isValidCommitmentSchema(item) {
@@ -109,6 +255,7 @@ const Storage = {
         const backupObj = {
             version: '1.0',
             appName: 'Agenda_juzgado',
+            database: 'Supabase/PostgreSQL (Prisma ORM)',
             exportedAt: new Date().toISOString(),
             count: commitments.length,
             commitments: commitments
@@ -155,7 +302,7 @@ const Storage = {
         }
     },
 
-    importBackup(validItems, mode = 'merge') {
+    async importBackup(validItems, mode = 'merge') {
         if (!Array.isArray(validItems)) {
             return { success: false, error: 'Datos no válidos para importar.' };
         }
@@ -185,6 +332,25 @@ const Storage = {
         }
 
         this.saveAll(finalList);
+
+        if (this.isOnline) {
+            try {
+                this.notifyStatus('syncing', true, 'Importando datos a Supabase con transacción Prisma...');
+                const res = await fetch(`${this.API_BASE}/commitments/import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: validItems, mode })
+                });
+                if (res.ok) {
+                    this.notifyStatus('connected', true, 'Datos importados y respaldados en Supabase');
+                } else {
+                    const err = await res.json();
+                    console.warn('Aviso en importación de Supabase:', err);
+                }
+            } catch (err) {
+                console.error('Error al sincronizar importación con Supabase:', err);
+            }
+        }
 
         const conflicts = typeof AgendaLogic !== 'undefined' && AgendaLogic.detectAllConflicts
             ? AgendaLogic.detectAllConflicts(finalList)

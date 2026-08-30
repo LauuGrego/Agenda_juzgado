@@ -512,6 +512,24 @@ body {
     border-color: var(--badge-zinc-border);
 }
 
+.status-pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+    animation: statusPulse 2s infinite ease-in-out;
+}
+
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.85); }
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
 .modal-custom {
     background-color: var(--bg-surface);
     color: var(--text-primary-custom);

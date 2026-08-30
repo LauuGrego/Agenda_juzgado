@@ -169,7 +169,10 @@ const UI = {
     render(commitments) {
         const { updatedCommitments, countDeactivated } = AgendaLogic.evaluateAutomaticDeactivations(commitments);
         if (countDeactivated > 0) {
+            const newlyExpired = updatedCommitments.filter(c => !c.active && c.deactivatedReason === 'expired');
+            const expiredIds = newlyExpired.map(c => c.id);
             Storage.saveAll(updatedCommitments);
+            Storage.syncExpired(expiredIds);
             commitments = updatedCommitments;
             this.showToast(`${countDeactivated} compromiso(s) se desactivaron automáticamente por vencimiento de horario.`, 'info');
         }
@@ -620,15 +623,15 @@ const UI = {
         this.toggleModal('detail-modal', true);
     },
 
-    confirmDeactivate(id) {
+    async confirmDeactivate(id) {
         if (confirm('¿Desea desactivar este registro? Podrá ser consultado en la pestaña de Desactivados.')) {
-            Storage.deactivate(id, 'manual');
+            await Storage.deactivate(id, 'manual');
             this.showToast('Registro desactivado correctamente.', 'success');
             this.render(Storage.getAll());
         }
     },
 
-    handleReactivate(id) {
+    async handleReactivate(id) {
         const commitments = Storage.getAll();
         const item = commitments.find(c => c.id === id);
         if (!item) return;
@@ -641,7 +644,7 @@ const UI = {
             return;
         }
 
-        if (Storage.reactivate(id)) {
+        if (await Storage.reactivate(id)) {
             this.showToast('Compromiso reactivado exitosamente.', 'success');
             this.render(Storage.getAll());
         }
@@ -754,6 +757,52 @@ const UI = {
 
         listContainer.innerHTML = html;
         this.toggleModal('conflicts-modal', true);
+    },
+
+    updateDbStatusBadge(status, isOnline, message, provider = 'supabase') {
+        const badgeContainer = document.getElementById('db-status-badge');
+        const mobileBadgeContainer = document.getElementById('db-status-badge-mobile');
+
+        let badgeClass = 'badge-zinc';
+        let dotColor = '#71717a';
+        let label = 'Modo Local';
+        let tooltip = message || 'Modo local sin conexión centralizada';
+
+        if (status === 'connected') {
+            badgeClass = 'badge-emerald';
+            dotColor = '#10b981';
+            label = (provider === 'local-postgres') ? 'Postgres Local' : 'Conectado';
+            tooltip = (provider === 'local-postgres') 
+                ? 'Conectado a la base de datos' 
+                : 'Conectado';
+        } else if (status === 'syncing') {
+            badgeClass = 'badge-indigo';
+            dotColor = '#6366f1';
+            label = 'Sincronizando...';
+            tooltip = message || 'Sincronizando datos';
+        } else if (status === 'checking') {
+            badgeClass = 'badge-amber';
+            dotColor = '#f59e0b';
+            label = 'Conectando...';
+            tooltip = message || 'Comprobando conexión';
+        }
+
+        const badgeHtml = `
+            <span class="status-pulse-dot" style="background-color: ${dotColor};"></span>
+            <span>${label}</span>
+        `;
+
+        if (badgeContainer) {
+            badgeContainer.className = `badge-custom ${badgeClass} font-mono d-inline-flex align-items-center gap-1 cursor-pointer`;
+            badgeContainer.title = tooltip;
+            badgeContainer.innerHTML = badgeHtml;
+        }
+
+        if (mobileBadgeContainer) {
+            mobileBadgeContainer.className = `badge-custom ${badgeClass} font-mono d-inline-flex align-items-center gap-1`;
+            mobileBadgeContainer.title = tooltip;
+            mobileBadgeContainer.innerHTML = badgeHtml;
+        }
     }
 };
 

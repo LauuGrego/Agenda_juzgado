@@ -1,0 +1,38 @@
+{
+  "name": "agenda-juzgado",
+  "version": "1.0.0",
+  "description": "Agenda Unica de Secretaria - Juzgado de Paz con Supabase y Prisma ORM",
+  "main": "server.js",
+  "scripts": {
+    "build": "prisma generate",
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test_suite.js",
+    "db:local:up": "docker compose up -d",
+    "db:local:down": "docker compose down",
+    "use:local": "node -e \"require('fs').copyFileSync('.env.local', '.env')\" && prisma db push --skip-generate",
+    "use:supabase": "node -e \"require('fs').copyFileSync('.env.supabase', '.env')\" && prisma db push --skip-generate",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:studio": "prisma studio"
+  },
+  "keywords": [
+    "agenda",
+    "juzgado",
+    "prisma",
+    "supabase",
+    "postgresql"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.4.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "pg": "^8.23.0",
+    "prisma": "^6.4.1"
+  }
+}

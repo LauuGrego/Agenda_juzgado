@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Commitment {
+  id                String    @id @default(cuid())
+  title             String
+  date              String    // Format YYYY-MM-DD
+  startTime         String    // Format HH:mm
+  endTime           String    // Format HH:mm
+  priority          String    @default("Media")
+  notes             String?   @default("")
+  active            Boolean   @default(true)
+  deactivatedReason String?
+  deactivatedAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([date])
+  @@index([active])
+  @@index([date, active])
+  @@map("commitments")
+}

@@ -7,15 +7,46 @@ document.addEventListener('DOMContentLoaded', () => {
 const App = {
     pendingImportItems: null,
 
-    init() {
+    async init() {
         UI.init();
         this.bindEvents();
+
+        // Escuchar cambios en el estado de conexión con la base de datos (Supabase o Local)
+        Storage.onStatusChange((status, isOnline, message, provider) => {
+            UI.updateDbStatusBadge(status, isOnline, message, provider);
+        });
+
+        // Inicialización y carga inicial desde la base de datos
+        await Storage.init();
         this.renderCurrent();
 
-        setInterval(() => {
-            const commitments = Storage.getAll();
-            UI.render(commitments);
-        }, 30000);
+        // Sincronización automática periódica en segundo plano (cada 8 segundos)
+        setInterval(async () => {
+            if (Storage.isOnline) {
+                await Storage.fetchRemoteData();
+                this.renderCurrent();
+            }
+        }, 8000);
+
+        // Sincronización automática instantánea cuando el usuario regresa a la pestaña o ventana
+        window.addEventListener('focus', async () => {
+            if (Storage.isOnline) {
+                await Storage.fetchRemoteData();
+                this.renderCurrent();
+            }
+        });
+
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && Storage.isOnline) {
+                await Storage.fetchRemoteData();
+                this.renderCurrent();
+            }
+        });
+
+        window.addEventListener('online', async () => {
+            await Storage.init();
+            this.renderCurrent();
+        });
     },
 
     renderCurrent() {
@@ -171,11 +202,11 @@ const App = {
             reader.readAsText(file);
         });
 
-        document.getElementById('btn-import-merge')?.addEventListener('click', () => {
+        document.getElementById('btn-import-merge')?.addEventListener('click', async () => {
             if (!App.pendingImportItems) return;
             UI.toggleModal('import-modal', false);
             
-            const result = Storage.importBackup(App.pendingImportItems, 'merge');
+            const result = await Storage.importBackup(App.pendingImportItems, 'merge');
             App.pendingImportItems = null;
 
             if (result.success) {
@@ -192,9 +223,9 @@ const App = {
 
                 if (result.conflicts && result.conflicts.length > 0) {
                     UI.showToast(
-                        `Se procesaron ${result.count} registro(s) ${detailsStr}. ⚠️ ATENCIÓN: Se detectaron ${result.conflicts.length} conflicto(s) de horario.`, 
+                        `Se procesaron ${result.count} registro(s) ${detailsStr}. Se detectaron ${result.conflicts.length} conflicto(s) de horario.`, 
                         'error',
-                        '¡Conflicto de Horario Detectado!'
+                        'Conflicto de Horario Detectado'
                     );
                     UI.showConflictsModal(result.conflicts);
                 } else {
@@ -205,20 +236,20 @@ const App = {
             }
         });
 
-        document.getElementById('btn-import-replace')?.addEventListener('click', () => {
+        document.getElementById('btn-import-replace')?.addEventListener('click', async () => {
             if (!App.pendingImportItems) return;
             UI.toggleModal('import-modal', false);
 
-            const result = Storage.importBackup(App.pendingImportItems, 'replace');
+            const result = await Storage.importBackup(App.pendingImportItems, 'replace');
             App.pendingImportItems = null;
 
             if (result.success) {
                 this.renderCurrent();
                 if (result.conflicts && result.conflicts.length > 0) {
                     UI.showToast(
-                        `Se reemplazaron los datos. ${result.count} registro(s) restaurado(s). ⚠️ ATENCIÓN: Se detectaron ${result.conflicts.length} conflicto(s) de horario.`, 
+                        `Se reemplazaron los datos. ${result.count} registro(s) restaurado(s). Se detectaron ${result.conflicts.length} conflicto(s) de horario.`, 
                         'error',
-                        '¡Conflicto de Horario Detectado!'
+                        'Conflicto de Horario Detectado'
                     );
                     UI.showConflictsModal(result.conflicts);
                 } else {
@@ -243,7 +274,7 @@ const App = {
         document.documentElement.setAttribute('data-theme', savedTheme);
     },
 
-    handleFormSubmit() {
+    async handleFormSubmit() {
         const titleRaw = document.getElementById('commitment-title').value;
         const dateRaw = document.getElementById('commitment-date').value;
         const startRaw = document.getElementById('commitment-start').value;
@@ -287,7 +318,7 @@ const App = {
 
         if (conflict) {
             UI.showToast(
-                `¡Conflicto de horario! Se solapa con "${Security.escapeHTML(conflict.title)}" (${conflict.startTime} - ${conflict.endTime} hs).`, 
+                `Conflicto de horario: se solapa con "${Security.escapeHTML(conflict.title)}" (${conflict.startTime} - ${conflict.endTime} hs).`, 
                 'error'
             );
             return;
@@ -303,11 +334,11 @@ const App = {
                 delete updatePayload.deactivatedReason;
                 delete updatePayload.deactivatedAt;
             }
-            Storage.update(UI.editingId, updatePayload);
+            await Storage.update(UI.editingId, updatePayload);
             UI.showToast('Compromiso actualizado con éxito.', 'success');
         } else {
-            Storage.add(sanitized);
-            UI.showToast('Compromiso creado exitosamente.', 'success');
+            await Storage.add(sanitized);
+            UI.showToast('Compromiso guardado exitosamente en Supabase.', 'success');
         }
 
         UI.toggleModal('commitment-modal', false);
