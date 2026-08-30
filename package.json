@@ -4,7 +4,7 @@
   "description": "Agenda Unica de Secretaria - Juzgado de Paz con Supabase y Prisma ORM",
   "main": "server.js",
   "scripts": {
-    "build": "npx prisma generate",
+    "build": "node node_modules/prisma/build/index.js generate",
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node test_suite.js",
