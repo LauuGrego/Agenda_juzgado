@@ -53,6 +53,55 @@ const Security = {
             priority: ['Baja', 'Media', 'Alta', 'Urgente'].includes(input.priority) ? input.priority : 'Media',
             notes: this.escapeHTML((input.notes || '').trim())
         };
+    },
+
+    // --- AUTENTICACIÓN Y SESIÓN DE USUARIO --- //
+    isAuthenticated() {
+        return sessionStorage.getItem('AGENDA_AUTHENTICATED') === 'true' || localStorage.getItem('AGENDA_AUTHENTICATED') === 'true';
+    },
+
+    async verifyPassword(password, rememberMe = false) {
+        if (!password || typeof password !== 'string') {
+            return { success: false, error: 'Por favor ingrese una contraseña.' };
+        }
+
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+
+            if (response.ok) {
+                this.setAuthSession(rememberMe);
+                return { success: true };
+            } else {
+                const data = await response.json().catch(() => ({}));
+                return { success: false, error: data.message || 'Contraseña incorrecta.' };
+            }
+        } catch (err) {
+            // Respaldar verificación local en modo offline / sin servidor Node activo
+            const defaultPass = 'juzgado2026';
+            if (password === defaultPass) {
+                this.setAuthSession(rememberMe);
+                return { success: true };
+            }
+            return { success: false, error: 'Contraseña incorrecta.' };
+        }
+    },
+
+    setAuthSession(rememberMe) {
+        sessionStorage.setItem('AGENDA_AUTHENTICATED', 'true');
+        if (rememberMe) {
+            localStorage.setItem('AGENDA_AUTHENTICATED', 'true');
+        } else {
+            localStorage.removeItem('AGENDA_AUTHENTICATED');
+        }
+    },
+
+    logout() {
+        sessionStorage.removeItem('AGENDA_AUTHENTICATED');
+        localStorage.removeItem('AGENDA_AUTHENTICATED');
     }
 };
 

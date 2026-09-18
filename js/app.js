@@ -9,6 +9,7 @@ const App = {
 
     async init() {
         UI.init();
+        this.checkAuthStatus();
         this.bindEvents();
 
         // Escuchar cambios en el estado de conexión con la base de datos (Supabase o Local)
@@ -18,11 +19,13 @@ const App = {
 
         // Inicialización y carga inicial desde la base de datos
         await Storage.init();
-        this.renderCurrent();
+        if (Security.isAuthenticated()) {
+            this.renderCurrent();
+        }
 
         // Sincronización automática periódica en segundo plano (cada 8 segundos)
         setInterval(async () => {
-            if (Storage.isOnline) {
+            if (Security.isAuthenticated() && Storage.isOnline) {
                 await Storage.fetchRemoteData();
                 this.renderCurrent();
             }
@@ -30,23 +33,39 @@ const App = {
 
         // Sincronización automática instantánea cuando el usuario regresa a la pestaña o ventana
         window.addEventListener('focus', async () => {
-            if (Storage.isOnline) {
+            if (Security.isAuthenticated() && Storage.isOnline) {
                 await Storage.fetchRemoteData();
                 this.renderCurrent();
             }
         });
 
         document.addEventListener('visibilitychange', async () => {
-            if (document.visibilityState === 'visible' && Storage.isOnline) {
+            if (document.visibilityState === 'visible' && Security.isAuthenticated() && Storage.isOnline) {
                 await Storage.fetchRemoteData();
                 this.renderCurrent();
             }
         });
 
         window.addEventListener('online', async () => {
-            await Storage.init();
-            this.renderCurrent();
+            if (Security.isAuthenticated()) {
+                await Storage.init();
+                this.renderCurrent();
+            }
         });
+    },
+
+    checkAuthStatus() {
+        const overlay = document.getElementById('auth-overlay');
+        if (!overlay) return;
+
+        if (Security.isAuthenticated()) {
+            overlay.classList.add('hidden');
+        } else {
+            overlay.classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('auth-password')?.focus();
+            }, 100);
+        }
     },
 
     renderCurrent() {
@@ -272,6 +291,75 @@ const App = {
         const savedTheme = localStorage.getItem('AGENDA_THEME') || 'dark';
         document.documentElement.setAttribute('data-bs-theme', savedTheme);
         document.documentElement.setAttribute('data-theme', savedTheme);
+
+        // --- EVENTOS DE AUTENTICACIÓN Y BLOQUEO --- //
+        const authForm = document.getElementById('auth-form');
+        if (authForm) {
+            authForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const passInput = document.getElementById('auth-password');
+                const rememberCheck = document.getElementById('auth-remember');
+                const errorBox = document.getElementById('auth-error');
+                const errorText = document.getElementById('auth-error-text');
+                const authCard = document.querySelector('.auth-card');
+                const submitBtn = document.getElementById('btn-auth-submit');
+
+                if (!passInput) return;
+                const password = passInput.value;
+                const remember = rememberCheck ? rememberCheck.checked : false;
+
+                if (submitBtn) submitBtn.disabled = true;
+
+                const result = await Security.verifyPassword(password, remember);
+
+                if (submitBtn) submitBtn.disabled = false;
+
+                if (result.success) {
+                    if (errorBox) errorBox.classList.add('d-none');
+                    passInput.value = '';
+                    const overlay = document.getElementById('auth-overlay');
+                    if (overlay) overlay.classList.add('hidden');
+                    
+                    this.renderCurrent();
+                    UI.showToast('Acceso concedido a la Agenda Única.', 'success');
+                } else {
+                    if (errorBox && errorText) {
+                        errorText.textContent = result.error || 'Contraseña incorrecta.';
+                        errorBox.classList.remove('d-none');
+                    }
+                    if (authCard) {
+                        authCard.classList.remove('shake-horizontal');
+                        void authCard.offsetWidth; // Force reflow
+                        authCard.classList.add('shake-horizontal');
+                    }
+                    passInput.select();
+                }
+            });
+        }
+
+        document.getElementById('btn-toggle-password')?.addEventListener('click', () => {
+            const passInput = document.getElementById('auth-password');
+            const eyeShow = document.getElementById('icon-eye-show');
+            const eyeHide = document.getElementById('icon-eye-hide');
+
+            if (passInput) {
+                const isPassword = passInput.type === 'password';
+                passInput.type = isPassword ? 'text' : 'password';
+                if (eyeShow && eyeHide) {
+                    eyeShow.classList.toggle('d-none', !isPassword);
+                    eyeHide.classList.toggle('d-none', isPassword);
+                }
+            }
+        });
+
+        const handleLockApp = () => {
+            Security.logout();
+            this.checkAuthStatus();
+            UI.showToast('Agenda bloqueada correctamente.', 'info');
+        };
+
+        document.getElementById('btn-lock-app')?.addEventListener('click', handleLockApp);
+        document.getElementById('btn-mobile-lock')?.addEventListener('click', handleLockApp);
     },
 
     async handleFormSubmit() {

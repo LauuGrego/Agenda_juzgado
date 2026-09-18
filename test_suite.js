@@ -11,6 +11,15 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
+const APP_PASSWORD = process.env.APP_PASSWORD || 'juzgado2026';
+
+app.post('/api/auth/login', (req, res) => {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ success: false, message: 'Falta contraseña' });
+    if (password === APP_PASSWORD) return res.json({ success: true });
+    return res.status(401).json({ success: false, message: 'Contraseña incorrecta' });
+});
+
 app.get('/api/health', async (req, res) => {
     try {
         await prisma.$queryRaw`SELECT 1`;
@@ -307,7 +316,30 @@ async function runTests() {
         }
     });
 
-    // TEST 10: Validación de Lógica de Conflicto de Horarios en JS
+    // TEST 10: Autenticación de Contraseña (POST /api/auth/login)
+    await assertTest('API REST: POST /api/auth/login (Verificación de contraseña)', async () => {
+        // Prueba con clave incorrecta
+        const badRes = await fetch(`${BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: 'clave_incorrecta_123' })
+        });
+        if (badRes.status !== 401) {
+            throw new Error(`Se esperaba status 401 para clave errónea, se obtuvo ${badRes.status}`);
+        }
+
+        // Prueba con clave correcta
+        const goodRes = await fetch(`${BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: 'juzgado2026' })
+        });
+        if (!goodRes.ok) {
+            throw new Error(`Se esperaba status 200 OK para clave correcta, se obtuvo ${goodRes.status}`);
+        }
+    });
+
+    // TEST 11: Validación de Lógica de Conflicto de Horarios en JS
     await assertTest('Lógica Frontend (AgendaLogic): Detección de solapamiento', async () => {
         const AgendaLogic = require('./js/agendaLogic.js');
         const existing = [

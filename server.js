@@ -27,6 +27,20 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
+const APP_PASSWORD = process.env.APP_PASSWORD;
+
+// Autenticación de acceso a la Agenda
+app.post('/api/auth/login', (req, res) => {
+    const { password } = req.body;
+    if (!password) {
+        return res.status(400).json({ success: false, message: 'La contraseña es requerida.' });
+    }
+    if (password === APP_PASSWORD) {
+        return res.json({ success: true, message: 'Acceso concedido.' });
+    }
+    return res.status(401).json({ success: false, message: 'Contraseña incorrecta.' });
+});
+
 // Health check & DB connection status
 app.get('/api/health', async (req, res) => {
     try {

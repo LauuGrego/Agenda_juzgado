@@ -69,6 +69,11 @@
                     <button id="theme-toggle" class="btn btn-outline-custom btn-sm p-1 px-2 d-flex align-items-center gap-1" title="Cambiar Tema">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                     </button>
+
+                    <button id="btn-lock-app" class="btn btn-outline-custom btn-sm p-1 px-2 d-flex align-items-center gap-1 text-rose-400" title="Bloquear Agenda">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span class="small">Bloquear</span>
+                    </button>
                 </div>
 
                 <!-- Botón Menú Hamburguesa Mobile -->
@@ -185,6 +190,10 @@
                     <button id="mobile-theme-toggle" class="btn btn-outline-custom text-start d-flex align-items-center gap-2 py-2 px-3 w-100 rounded-2" data-bs-dismiss="offcanvas">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                         <span>Cambiar Tema</span>
+                    </button>
+                    <button id="btn-mobile-lock" class="btn btn-outline-custom text-start d-flex align-items-center gap-2 py-2 px-3 w-100 rounded-2 text-rose-400" data-bs-dismiss="offcanvas">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span>Bloquear Agenda</span>
                     </button>
                 </div>
             </div>
@@ -339,6 +348,54 @@
                     <button type="button" class="btn btn-indigo btn-sm text-white btn-close-modal px-4" data-bs-dismiss="modal">Entendido</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE ACCESO CON CONTRASEÑA -->
+    <div id="auth-overlay" class="auth-overlay">
+        <div class="auth-card p-4 p-sm-5 rounded-4 shadow-lg border">
+            <div class="text-center mb-4">
+                <div class="brand-icon bg-indigo rounded-3 d-inline-flex align-items-center justify-content-center text-white mb-3" style="width: 48px; height: 48px;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </div>
+                <h2 class="h5 fw-semibold text-primary-custom mb-1">Acceso Secretaría</h2>
+                <p class="small text-secondary-custom mb-0">Agenda Única de Secretaría - Juzgado de Paz</p>
+            </div>
+
+            <form id="auth-form" autocomplete="off">
+                <div class="mb-3">
+                    <label for="auth-password" class="form-label small text-secondary-custom fw-medium">Contraseña de Acceso</label>
+                    <div class="input-group input-group-sm position-relative">
+                        <span class="input-group-text input-group-icon px-2.5">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        </span>
+                        <input type="password" id="auth-password" class="form-control input-custom pe-5" placeholder="Ingrese contraseña..." required autocomplete="current-password">
+                        <button type="button" id="btn-toggle-password" class="btn btn-outline-custom p-1 px-2.5 position-absolute end-0 top-0 bottom-0 z-3 border-0 bg-transparent text-secondary-custom" title="Mostrar/Ocultar contraseña">
+                            <svg id="icon-eye-show" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg id="icon-eye-hide" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="d-none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        </button>
+                    </div>
+                    <div id="auth-error" class="text-rose-400 small mt-2 d-none d-flex align-items-center gap-1 font-mono" style="font-size: 0.78rem;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <span id="auth-error-text">Contraseña incorrecta.</span>
+                    </div>
+                </div>
+
+                <div class="form-check mb-4">
+                    <input class="form-check-input input-custom" type="checkbox" id="auth-remember" checked>
+                    <label class="form-check-label small text-secondary-custom" for="auth-remember">
+                        Recordar acceso en este equipo
+                    </label>
+                </div>
+
+                <button type="submit" id="btn-auth-submit" class="btn btn-indigo w-100 py-2 text-white font-medium d-flex align-items-center justify-content-center gap-2">
+                    <span>Ingresar a la Agenda</span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </button>
+            </form>
         </div>
     </div>
 

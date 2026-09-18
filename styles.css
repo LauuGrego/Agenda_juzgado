@@ -794,3 +794,50 @@ body {
     border-left-color: #6366f1;
     background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(24, 24, 27, 0.96) 100%);
 }
+
+/* --- 14. PANTALLA DE AUTENTICACIÓN Y BLOQUEO (AUTH OVERLAY) --- */
+.auth-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10000;
+    background-color: rgba(9, 9, 11, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    transition: opacity 0.25s ease-out, visibility 0.25s ease-out;
+}
+
+[data-bs-theme="light"] .auth-overlay {
+    background-color: rgba(244, 244, 245, 0.92);
+}
+
+.auth-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.auth-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-custom);
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+}
+
+.shake-horizontal {
+    animation: shakeHorizontal 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shakeHorizontal {
+    10%, 90% { transform: translate3d(-2px, 0, 0); }
+    20%, 80% { transform: translate3d(4px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+    40%, 60% { transform: translate3d(6px, 0, 0); }
+}
