@@ -90,6 +90,9 @@ async function runBackupSync() {
                     added++;
                 }
             }
+        }, {
+            maxWait: 20000,
+            timeout: 60000
         });
 
         console.log('\n====================================================');
