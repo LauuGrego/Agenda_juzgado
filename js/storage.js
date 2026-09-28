@@ -84,7 +84,47 @@ const Storage = {
             if (res.ok) {
                 const remoteCommitments = await res.json();
                 if (Array.isArray(remoteCommitments)) {
-                    this._memoryCache = remoteCommitments.filter(this.isValidCommitmentSchema);
+                    const validRemote = remoteCommitments.filter(this.isValidCommitmentSchema);
+                    const remoteMap = new Map(validRemote.map(c => [c.id, c]));
+
+                    // Sincronización bidireccional: Si había datos creados en modo local (offline),
+                    // subirlos a Supabase para no perder lo que se cargó sin conexión
+                    const localCommitments = this.getLocalData();
+                    const pendingUpload = [];
+
+                    for (const local of localCommitments) {
+                        const remote = remoteMap.get(local.id);
+                        if (!remote) {
+                            pendingUpload.push(local);
+                        } else if (local.updatedAt && remote.updatedAt && new Date(local.updatedAt) > new Date(remote.updatedAt)) {
+                            pendingUpload.push(local);
+                        }
+                    }
+
+                    if (pendingUpload.length > 0) {
+                        try {
+                            await fetch(`${this.API_BASE}/commitments/import`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ items: pendingUpload, mode: 'merge' })
+                            });
+                            // Re-consultar estado consolidado
+                            const reSyncRes = await fetch(`${this.API_BASE}/commitments`);
+                            if (reSyncRes.ok) {
+                                const consolidated = await reSyncRes.json();
+                                if (Array.isArray(consolidated)) {
+                                    this._memoryCache = consolidated.filter(this.isValidCommitmentSchema);
+                                    this.saveLocalData(this._memoryCache);
+                                    this.notifyStatus('connected', true, 'Base de datos sincronizada', this.provider);
+                                    return this._memoryCache;
+                                }
+                            }
+                        } catch (uploadErr) {
+                            console.warn('Aviso: No se pudieron sincronizar los datos locales pendientes:', uploadErr);
+                        }
+                    }
+
+                    this._memoryCache = validRemote;
                     this.saveLocalData(this._memoryCache);
                     this.notifyStatus('connected', true, 'Base de datos sincronizada', this.provider);
                     return this._memoryCache;
