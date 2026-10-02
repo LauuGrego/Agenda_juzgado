@@ -11,8 +11,86 @@ const UI = {
         currentIndex: -1
     },
 
+    listFilters: {
+        search: '',
+        date: '',
+        priority: 'all',
+        reason: 'all'
+    },
+
+    setListFilter(field, value, focusTargetId = null) {
+        this.listFilters[field] = value;
+        if (field === 'search') {
+            const headerSearch = document.getElementById('search-input');
+            if (headerSearch && headerSearch.value !== value) {
+                headerSearch.value = value;
+            }
+        }
+        if (field === 'date' && value) {
+            this.currentDate = value;
+            this.updateDateDisplay();
+        }
+        this.applyListFilterAndRender(focusTargetId);
+    },
+
+    clearFilterField(field) {
+        this.listFilters[field] = (field === 'priority' || field === 'reason') ? 'all' : '';
+        if (field === 'search') {
+            const headerSearch = document.getElementById('search-input');
+            if (headerSearch) headerSearch.value = '';
+        }
+        if (typeof App !== 'undefined') {
+            App.renderCurrent();
+        }
+    },
+
+    resetListFilters() {
+        this.listFilters = {
+            search: '',
+            date: '',
+            priority: 'all',
+            reason: 'all'
+        };
+        const headerSearch = document.getElementById('search-input');
+        if (headerSearch) headerSearch.value = '';
+        if (typeof App !== 'undefined') {
+            App.renderCurrent();
+        }
+    },
+
+    hasActiveListFilters() {
+        return Boolean(
+            (this.listFilters.search && this.listFilters.search.trim() !== '') ||
+            (this.listFilters.date && this.listFilters.date !== '') ||
+            (this.listFilters.priority && this.listFilters.priority !== 'all') ||
+            (this.currentTab === 'deactivated' && this.listFilters.reason && this.listFilters.reason !== 'all')
+        );
+    },
+
+    applyListFilterAndRender(focusTargetId = null) {
+        const activeEl = document.activeElement;
+        const targetId = focusTargetId || (activeEl ? activeEl.id : null);
+        const selStart = (activeEl && typeof activeEl.selectionStart === 'number') ? activeEl.selectionStart : null;
+        const selEnd = (activeEl && typeof activeEl.selectionEnd === 'number') ? activeEl.selectionEnd : null;
+
+        if (typeof App !== 'undefined') {
+            App.renderCurrent();
+        }
+
+        if (targetId) {
+            const restored = document.getElementById(targetId);
+            if (restored) {
+                restored.focus();
+                if (selStart !== null && selEnd !== null && typeof restored.setSelectionRange === 'function') {
+                    try { restored.setSelectionRange(selStart, selEnd); } catch (e) {}
+                }
+            }
+        }
+    },
+
     updateSearch(queryRaw) {
         const query = (queryRaw || '').toLowerCase().trim();
+        this.listFilters.search = queryRaw || '';
         const countEl = document.getElementById('search-count');
         const prevBtn = document.getElementById('btn-search-prev');
         const nextBtn = document.getElementById('btn-search-next');
@@ -31,9 +109,14 @@ const UI = {
         if (clearBtn) clearBtn.classList.remove('d-none');
 
         const allCommitments = typeof Storage !== 'undefined' ? Storage.getAll() : [];
-        const isDeactivatedTab = (this.currentTab === 'deactivated');
-        
-        const filteredCommitments = allCommitments.filter(item => isDeactivatedTab ? !item.active : item.active);
+        let filteredCommitments;
+        if (this.currentTab === 'grid') {
+            filteredCommitments = allCommitments.filter(item => item.active || item.deactivatedReason === 'expired');
+        } else if (this.currentTab === 'list') {
+            filteredCommitments = allCommitments.filter(item => item.active);
+        } else {
+            filteredCommitments = allCommitments.filter(item => !item.active);
+        }
 
         const matches = filteredCommitments.filter(item => {
             return (
@@ -107,6 +190,7 @@ const UI = {
     clearSearch() {
         const input = document.getElementById('search-input');
         if (input) input.value = '';
+        this.listFilters.search = '';
         this.updateSearch('');
     },
 
@@ -194,7 +278,9 @@ const UI = {
 
         const slots = AgendaLogic.getTimeSlots();
         const rowSlots = slots.slice(0, -1);
-        const activeToday = commitments.filter(item => item.active && item.date === this.currentDate);
+        const dayCommitments = commitments.filter(item => 
+            (item.active || item.deactivatedReason === 'expired') && item.date === this.currentDate
+        );
 
         const now = new Date();
         const todayStr = AgendaLogic.getLocalDateString(now);
@@ -212,7 +298,7 @@ const UI = {
             }
         }
 
-        const positionedEvents = AgendaLogic.calculateLayoutPositions(activeToday);
+        const positionedEvents = AgendaLogic.calculateLayoutPositions(dayCommitments);
 
         let html = `
             <div class="grid-table">
@@ -234,7 +320,7 @@ const UI = {
             const nextSlotTime = `${endH}:${endM}`;
 
             const slotMins = AgendaLogic.timeToMinutes(slotTime);
-            const isSlotCovered = activeToday.some(item => {
+            const isSlotCovered = dayCommitments.some(item => {
                 const startMins = AgendaLogic.timeToMinutes(item.startTime);
                 const endMins = AgendaLogic.timeToMinutes(item.endTime);
                 return slotMins >= startMins && slotMins < endMins;
@@ -271,6 +357,8 @@ const UI = {
         html += `<div class="grid-events-layer">`;
 
         positionedEvents.forEach(item => {
+            const isExpired = !item.active && item.deactivatedReason === 'expired';
+
             let prioBadge = '';
             if (item.priority === 'Urgente') {
                 prioBadge = `<span class="badge-custom badge-rose">Urgente</span>`;
@@ -283,6 +371,13 @@ const UI = {
             if (item.hasConflict) {
                 cardConflictClass = 'has-conflict';
                 conflictBadge = `<span class="badge-custom badge-rose me-1 font-mono">Conflicto</span>`;
+            }
+
+            let expiredBadge = '';
+            let cardExpiredClass = '';
+            if (isExpired) {
+                cardExpiredClass = 'is-expired';
+                expiredBadge = `<span class="badge-custom badge-zinc">Vencido</span>`;
             }
 
             let searchClass = '';
@@ -307,19 +402,18 @@ const UI = {
                 }
             }
 
-            html += `
-                <div class="commitment-card ${cardConflictClass} ${searchClass}" 
-                     style="top: ${item.topPx}px; height: ${item.heightPx}px; left: calc(${item.leftPct}% + 4px); width: calc(${item.widthPct}% - 8px);"
-                     onclick="UI.showDetailModal('${item.id}')">
-                    <div class="card-top-bar">
-                        <span class="card-time-badge font-mono">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)}</span>
-                        <div class="d-flex align-items-center gap-1">
-                            ${conflictBadge}
-                            ${prioBadge}
-                        </div>
+            const actionsHtml = isExpired
+                ? `
+                    <div class="card-actions-hover" onclick="event.stopPropagation()">
+                        <button class="btn-icon" title="Ver detalle" onclick="UI.showDetailModal('${item.id}')">
+                            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                        <button class="btn-icon" title="Editar / Reactivar" onclick="UI.openEditModal('${item.id}')">
+                            <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
                     </div>
-                    <div class="card-title text-truncate">${Security.escapeHTML(item.title)}</div>
-                    
+                `
+                : `
                     <div class="card-actions-hover" onclick="event.stopPropagation()">
                         <button class="btn-icon" title="Editar" onclick="UI.openEditModal('${item.id}')">
                             <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -328,6 +422,22 @@ const UI = {
                             <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="1.5" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
                         </button>
                     </div>
+                `;
+
+            html += `
+                <div class="commitment-card ${cardConflictClass} ${cardExpiredClass} ${searchClass}" 
+                     style="top: ${item.topPx}px; height: ${item.heightPx}px; left: calc(${item.leftPct}% + 4px); width: calc(${item.widthPct}% - 8px);"
+                     onclick="UI.showDetailModal('${item.id}')">
+                    <div class="card-top-bar">
+                        <span class="card-time-badge font-mono">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)}</span>
+                        <div class="d-flex align-items-center gap-1">
+                            ${conflictBadge}
+                            ${expiredBadge}
+                            ${prioBadge}
+                        </div>
+                    </div>
+                    <div class="card-title text-truncate">${Security.escapeHTML(item.title)}</div>
+                    ${actionsHtml}
                 </div>
             `;
         });
@@ -346,26 +456,117 @@ const UI = {
         if (!container) return;
 
         const activeList = commitments.filter(item => item.active);
-        const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+        const totalCount = activeList.length;
+
+        const { search, date, priority } = this.listFilters;
+        const searchLower = (search || '').toLowerCase().trim();
 
         const filtered = activeList.filter(item => {
-            if (!searchQuery) return true;
-            return (
-                (item.title && item.title.toLowerCase().includes(searchQuery)) ||
-                (item.notes && item.notes.toLowerCase().includes(searchQuery)) ||
-                (item.priority && item.priority.toLowerCase().includes(searchQuery)) ||
-                (item.date && item.date.includes(searchQuery))
-            );
+            if (date && item.date !== date) {
+                return false;
+            }
+            if (priority && priority !== 'all' && item.priority !== priority) {
+                return false;
+            }
+            if (searchLower) {
+                const titleMatch = item.title && item.title.toLowerCase().includes(searchLower);
+                const notesMatch = item.notes && item.notes.toLowerCase().includes(searchLower);
+                const dateMatch = item.date && item.date.includes(searchLower);
+                const timeMatch = (item.startTime + ' ' + item.endTime).includes(searchLower);
+                if (!titleMatch && !notesMatch && !dateMatch && !timeMatch) {
+                    return false;
+                }
+            }
+            return true;
         });
 
-        if (filtered.length === 0) {
-            container.innerHTML = `
-                <div class="card bg-surface border-secondary-subtle p-4 text-center text-secondary rounded-3">
-                    <svg class="mb-2 opacity-50" viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" stroke-width="1.5" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                    <h3 class="h6 text-primary-custom mb-1">No hay compromisos activos</h3>
-                    <p class="small mb-0">No se encontraron compromisos programados que coincidan con la búsqueda.</p>
+        const hasActiveFilters = this.hasActiveListFilters();
+
+        const toolbarHtml = `
+            <div class="filter-toolbar card bg-surface border-secondary-subtle p-2.5 rounded-3 mb-3 shadow-sm">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pb-2 border-bottom border-secondary-subtle border-opacity-25">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="small fw-semibold text-primary-custom d-flex align-items-center gap-1.5">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                            Filtros de Búsqueda
+                        </span>
+                        <span class="badge-custom badge-zinc font-mono small">${filtered.length} de ${totalCount} compromisos</span>
+                    </div>
+                    ${hasActiveFilters ? `
+                        <button class="btn btn-outline-custom btn-sm py-0.5 px-2 text-rose-400 d-flex align-items-center gap-1 small" onclick="UI.resetListFilters()" title="Restablecer todos los filtros">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            <span>Limpiar filtros</span>
+                        </button>
+                    ` : ''}
                 </div>
-            `;
+
+                <div class="row g-2 align-items-center">
+                    <!-- Búsqueda por Nombre / Título / Notas -->
+                    <div class="col-12 col-md-5">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text input-group-icon px-2">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            </span>
+                            <input type="text" id="filter-search-active" class="form-control input-custom" placeholder="Buscar por nombre, carátula, notas..." value="${Security.escapeHTML(this.listFilters.search)}" oninput="UI.setListFilter('search', this.value, 'filter-search-active')">
+                            ${this.listFilters.search ? `
+                                <button class="btn btn-outline-custom p-1 px-1.5" onclick="UI.clearFilterField('search')" title="Limpiar texto">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Filtro por Fecha -->
+                    <div class="col-12 col-sm-6 col-md-4">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text input-group-icon px-2" title="Filtrar por fecha">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            </span>
+                            <input type="date" id="filter-date-active" class="form-control input-custom font-mono" value="${Security.escapeHTML(this.listFilters.date)}" onchange="UI.setListFilter('date', this.value)">
+                            ${this.listFilters.date ? `
+                                <button class="btn btn-outline-custom p-1 px-1.5" onclick="UI.clearFilterField('date')" title="Ver todas las fechas">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Filtro por Prioridad -->
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <select id="filter-priority-active" class="form-select form-select-sm input-custom" onchange="UI.setListFilter('priority', this.value)">
+                            <option value="all" ${this.listFilters.priority === 'all' ? 'selected' : ''}>Todas las prioridades</option>
+                            <option value="Urgente" ${this.listFilters.priority === 'Urgente' ? 'selected' : ''}>Urgente</option>
+                            <option value="Alta" ${this.listFilters.priority === 'Alta' ? 'selected' : ''}>Alta</option>
+                            <option value="Media" ${this.listFilters.priority === 'Media' ? 'selected' : ''}>Media</option>
+                            <option value="Baja" ${this.listFilters.priority === 'Baja' ? 'selected' : ''}>Baja</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        if (filtered.length === 0) {
+            const emptyMsg = hasActiveFilters
+                ? `
+                    <div class="card bg-surface border-secondary-subtle p-4 text-center text-secondary rounded-3">
+                        <svg class="mb-2 opacity-50" viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="1.5" fill="none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <h3 class="h6 text-primary-custom mb-1">Sin resultados coincidentes</h3>
+                        <p class="small mb-3 text-secondary-custom">No se encontraron compromisos que coincidan con los filtros aplicados.</p>
+                        <div>
+                            <button class="btn btn-outline-custom btn-sm py-1 px-3" onclick="UI.resetListFilters()">
+                                Limpiar filtros
+                            </button>
+                        </div>
+                    </div>
+                `
+                : `
+                    <div class="card bg-surface border-secondary-subtle p-4 text-center text-secondary rounded-3">
+                        <svg class="mb-2 opacity-50" viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" stroke-width="1.5" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        <h3 class="h6 text-primary-custom mb-1">No hay compromisos activos</h3>
+                        <p class="small mb-0">No hay compromisos activos programados en el sistema.</p>
+                    </div>
+                `;
+            container.innerHTML = toolbarHtml + emptyMsg;
             return;
         }
 
@@ -386,7 +587,7 @@ const UI = {
                     <td>${prioBadge}</td>
                     <td>
                         <div class="d-flex gap-1">
-                            <button class="btn btn-outline-secondary btn-sm py-0 px-2" onclick="UI.showDetailModal('${item.id}')">Detalle</button>
+                            <button class="btn btn-outline-custom btn-sm py-0 px-2" onclick="UI.showDetailModal('${item.id}')">Detalle</button>
                             <button class="btn btn-indigo btn-sm py-0 px-2 text-white" onclick="UI.openEditModal('${item.id}')">Editar</button>
                             <button class="btn btn-outline-danger btn-sm py-0 px-2" onclick="UI.confirmDeactivate('${item.id}')">Desactivar</button>
                         </div>
@@ -397,7 +598,7 @@ const UI = {
 
         let desktopHtml = `
             <div class="d-none d-md-block table-responsive card bg-surface border-secondary-subtle rounded-3">
-                <table class="table table-dark table-hover align-middle mb-0 small">
+                <table class="table table-custom table-hover align-middle mb-0 small">
                     <thead>
                         <tr>
                             <th>Fecha</th>
@@ -433,7 +634,7 @@ const UI = {
                     <h4 class="h6 fw-semibold text-primary-custom mb-1">${Security.escapeHTML(item.title)}</h4>
                     ${item.notes ? `<p class="small text-secondary-custom mb-2 text-truncate">${Security.escapeHTML(item.notes)}</p>` : ''}
                     <div class="d-flex gap-1 mt-2 pt-2 border-top border-secondary-subtle border-opacity-25">
-                        <button class="btn btn-outline-secondary btn-sm py-1 px-2 flex-grow-1" onclick="UI.showDetailModal('${item.id}')">Detalle</button>
+                        <button class="btn btn-outline-custom btn-sm py-1 px-2 flex-grow-1" onclick="UI.showDetailModal('${item.id}')">Detalle</button>
                         <button class="btn btn-indigo btn-sm py-1 px-2 text-white flex-grow-1" onclick="UI.openEditModal('${item.id}')">Editar</button>
                         <button class="btn btn-outline-danger btn-sm py-1 px-2 flex-grow-1" onclick="UI.confirmDeactivate('${item.id}')">Desactivar</button>
                     </div>
@@ -447,7 +648,7 @@ const UI = {
             </div>
         `;
 
-        container.innerHTML = desktopHtml + mobileHtml;
+        container.innerHTML = toolbarHtml + desktopHtml + mobileHtml;
     },
 
     renderDeactivatedList(commitments) {
@@ -455,26 +656,130 @@ const UI = {
         if (!container) return;
 
         const deactivatedList = commitments.filter(item => !item.active);
-        const searchQuery = (document.getElementById('search-input')?.value || '').toLowerCase().trim();
+        const totalCount = deactivatedList.length;
+
+        const { search, date, priority, reason } = this.listFilters;
+        const searchLower = (search || '').toLowerCase().trim();
 
         const filtered = deactivatedList.filter(item => {
-            if (!searchQuery) return true;
-            return (
-                (item.title && item.title.toLowerCase().includes(searchQuery)) ||
-                (item.notes && item.notes.toLowerCase().includes(searchQuery)) ||
-                (item.priority && item.priority.toLowerCase().includes(searchQuery)) ||
-                (item.date && item.date.includes(searchQuery))
-            );
+            if (date && item.date !== date) {
+                return false;
+            }
+            if (priority && priority !== 'all' && item.priority !== priority) {
+                return false;
+            }
+            if (reason && reason !== 'all') {
+                if (reason === 'expired' && item.deactivatedReason !== 'expired') return false;
+                if (reason === 'manual' && item.deactivatedReason !== 'manual') return false;
+            }
+            if (searchLower) {
+                const titleMatch = item.title && item.title.toLowerCase().includes(searchLower);
+                const notesMatch = item.notes && item.notes.toLowerCase().includes(searchLower);
+                const dateMatch = item.date && item.date.includes(searchLower);
+                const timeMatch = (item.startTime + ' ' + item.endTime).includes(searchLower);
+                if (!titleMatch && !notesMatch && !dateMatch && !timeMatch) {
+                    return false;
+                }
+            }
+            return true;
         });
 
-        if (filtered.length === 0) {
-            container.innerHTML = `
-                <div class="card bg-surface border-secondary-subtle p-4 text-center text-secondary rounded-3">
-                    <svg class="mb-2 opacity-50" viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" stroke-width="1.5" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                    <h3 class="h6 text-primary-custom mb-1">No hay registros desactivados</h3>
-                    <p class="small mb-0">Los compromisos desactivados manualmente o por vencimiento aparecerán aquí.</p>
+        const hasActiveFilters = this.hasActiveListFilters();
+
+        const toolbarHtml = `
+            <div class="filter-toolbar card bg-surface border-secondary-subtle p-2.5 rounded-3 mb-3 shadow-sm">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pb-2 border-bottom border-secondary-subtle border-opacity-25">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="small fw-semibold text-primary-custom d-flex align-items-center gap-1.5">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                            Filtros de Búsqueda
+                        </span>
+                        <span class="badge-custom badge-zinc font-mono small">${filtered.length} de ${totalCount} registros</span>
+                    </div>
+                    ${hasActiveFilters ? `
+                        <button class="btn btn-outline-custom btn-sm py-0.5 px-2 text-rose-400 d-flex align-items-center gap-1 small" onclick="UI.resetListFilters()" title="Restablecer todos los filtros">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            <span>Limpiar filtros</span>
+                        </button>
+                    ` : ''}
                 </div>
-            `;
+
+                <div class="row g-2 align-items-center">
+                    <!-- Búsqueda por Nombre / Título / Notas -->
+                    <div class="col-12 col-md-4">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text input-group-icon px-2">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            </span>
+                            <input type="text" id="filter-search-deactivated" class="form-control input-custom" placeholder="Buscar por nombre, carátula, notas..." value="${Security.escapeHTML(this.listFilters.search)}" oninput="UI.setListFilter('search', this.value, 'filter-search-deactivated')">
+                            ${this.listFilters.search ? `
+                                <button class="btn btn-outline-custom p-1 px-1.5" onclick="UI.clearFilterField('search')" title="Limpiar texto">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Filtro por Fecha -->
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text input-group-icon px-2" title="Filtrar por fecha">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            </span>
+                            <input type="date" id="filter-date-deactivated" class="form-control input-custom font-mono" value="${Security.escapeHTML(this.listFilters.date)}" onchange="UI.setListFilter('date', this.value)">
+                            ${this.listFilters.date ? `
+                                <button class="btn btn-outline-custom p-1 px-1.5" onclick="UI.clearFilterField('date')" title="Ver todas las fechas">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Filtro por Motivo de Desactivación -->
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <select id="filter-reason-deactivated" class="form-select form-select-sm input-custom" onchange="UI.setListFilter('reason', this.value)">
+                            <option value="all" ${this.listFilters.reason === 'all' ? 'selected' : ''}>Todos los motivos</option>
+                            <option value="expired" ${this.listFilters.reason === 'expired' ? 'selected' : ''}>Vencimiento de horario</option>
+                            <option value="manual" ${this.listFilters.reason === 'manual' ? 'selected' : ''}>Desactivación manual</option>
+                        </select>
+                    </div>
+
+                    <!-- Filtro por Prioridad -->
+                    <div class="col-12 col-md-2">
+                        <select id="filter-priority-deactivated" class="form-select form-select-sm input-custom" onchange="UI.setListFilter('priority', this.value)">
+                            <option value="all" ${this.listFilters.priority === 'all' ? 'selected' : ''}>Todas prioridades</option>
+                            <option value="Urgente" ${this.listFilters.priority === 'Urgente' ? 'selected' : ''}>Urgente</option>
+                            <option value="Alta" ${this.listFilters.priority === 'Alta' ? 'selected' : ''}>Alta</option>
+                            <option value="Media" ${this.listFilters.priority === 'Media' ? 'selected' : ''}>Media</option>
+                            <option value="Baja" ${this.listFilters.priority === 'Baja' ? 'selected' : ''}>Baja</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        if (filtered.length === 0) {
+            const emptyMsg = hasActiveFilters
+                ? `
+                    <div class="card bg-surface border-secondary-subtle p-4 text-center text-secondary rounded-3">
+                        <svg class="mb-2 opacity-50" viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="1.5" fill="none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <h3 class="h6 text-primary-custom mb-1">Sin resultados coincidentes</h3>
+                        <p class="small mb-3 text-secondary-custom">No se encontraron registros desactivados con los filtros seleccionados.</p>
+                        <div>
+                            <button class="btn btn-outline-custom btn-sm py-1 px-3" onclick="UI.resetListFilters()">
+                                Limpiar filtros
+                            </button>
+                        </div>
+                    </div>
+                `
+                : `
+                    <div class="card bg-surface border-secondary-subtle p-4 text-center text-secondary rounded-3">
+                        <svg class="mb-2 opacity-50" viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" stroke-width="1.5" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <h3 class="h6 text-primary-custom mb-1">No hay registros desactivados</h3>
+                        <p class="small mb-0">Los compromisos desactivados manualmente o por vencimiento aparecerán aquí.</p>
+                    </div>
+                `;
+            container.innerHTML = toolbarHtml + emptyMsg;
             return;
         }
 
@@ -484,17 +789,23 @@ const UI = {
         let tableRows = sorted.map(item => {
             const isExpired = item.deactivatedReason === 'expired';
             const reasonLabel = isExpired ? 'Vencimiento de horario' : 'Desactivación manual';
-            const reasonBadge = isExpired ? `<span class="badge-custom badge-rose">${reasonLabel}</span>` : `<span class="badge-custom badge-amber">${reasonLabel}</span>`;
+            const reasonBadge = isExpired ? `<span class="badge-custom badge-zinc">${reasonLabel}</span>` : `<span class="badge-custom badge-amber">${reasonLabel}</span>`;
+
+            let prioBadge = `<span class="badge-custom badge-zinc">Normal</span>`;
+            if (item.priority === 'Urgente') prioBadge = `<span class="badge-custom badge-rose">Urgente</span>`;
+            else if (item.priority === 'Alta') prioBadge = `<span class="badge-custom badge-amber">Alta</span>`;
+            else if (item.priority === 'Baja') prioBadge = `<span class="badge-custom badge-zinc">Baja</span>`;
 
             return `
                 <tr>
                     <td class="font-mono"><strong>${Security.escapeHTML(item.date)}</strong></td>
                     <td><span class="badge-custom badge-zinc font-mono">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)} hs</span></td>
                     <td class="title-inactive fw-medium">${Security.escapeHTML(item.title)}</td>
+                    <td>${prioBadge}</td>
                     <td>${reasonBadge}</td>
                     <td>
                         <div class="d-flex gap-1">
-                            <button class="btn btn-outline-secondary btn-sm py-0 px-2" onclick="UI.showDetailModal('${item.id}')">Detalle</button>
+                            <button class="btn btn-outline-custom btn-sm py-0 px-2" onclick="UI.showDetailModal('${item.id}')">Detalle</button>
                             <button class="btn btn-indigo btn-sm py-0 px-2 text-white" onclick="UI.openEditModal('${item.id}')">Editar</button>
                             <button class="btn btn-outline-success btn-sm py-0 px-2" onclick="UI.handleReactivate('${item.id}')">Reactivar</button>
                         </div>
@@ -505,12 +816,13 @@ const UI = {
 
         let desktopHtml = `
             <div class="d-none d-md-block table-responsive card bg-surface border-secondary-subtle rounded-3">
-                <table class="table table-dark table-hover align-middle mb-0 small opacity-75">
+                <table class="table table-custom table-hover align-middle mb-0 small">
                     <thead>
                         <tr>
                             <th>Fecha</th>
                             <th>Horario</th>
                             <th>Título / Motivo</th>
+                            <th>Prioridad</th>
                             <th>Motivo Desactivación</th>
                             <th>Acciones</th>
                         </tr>
@@ -526,21 +838,26 @@ const UI = {
         let mobileCards = sorted.map(item => {
             const isExpired = item.deactivatedReason === 'expired';
             const reasonLabel = isExpired ? 'Vencimiento de horario' : 'Desactivación manual';
-            const reasonBadge = isExpired ? `<span class="badge-custom badge-rose">${reasonLabel}</span>` : `<span class="badge-custom badge-amber">${reasonLabel}</span>`;
+            const reasonBadge = isExpired ? `<span class="badge-custom badge-zinc">${reasonLabel}</span>` : `<span class="badge-custom badge-amber">${reasonLabel}</span>`;
+
+            let prioBadge = `<span class="badge-custom badge-zinc">Normal</span>`;
+            if (item.priority === 'Urgente') prioBadge = `<span class="badge-custom badge-rose">Urgente</span>`;
+            else if (item.priority === 'Alta') prioBadge = `<span class="badge-custom badge-amber">Alta</span>`;
+            else if (item.priority === 'Baja') prioBadge = `<span class="badge-custom badge-zinc">Baja</span>`;
 
             return `
-                <div class="card bg-surface border-secondary-subtle p-3 rounded-3 shadow-sm mb-2 opacity-75">
+                <div class="card bg-surface border-secondary-subtle p-3 rounded-3 shadow-sm mb-2">
                     <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                         <div>
                             <div class="font-mono text-primary-custom fw-bold small">${Security.escapeHTML(item.date)}</div>
                             <span class="badge-custom badge-zinc font-mono small">${Security.escapeHTML(item.startTime)} - ${Security.escapeHTML(item.endTime)} hs</span>
                         </div>
-                        <div>${reasonBadge}</div>
+                        <div class="d-flex align-items-center gap-1">${prioBadge}${reasonBadge}</div>
                     </div>
                     <h4 class="h6 fw-semibold text-primary-custom title-inactive mb-1">${Security.escapeHTML(item.title)}</h4>
                     ${item.notes ? `<p class="small text-secondary-custom mb-2 text-truncate">${Security.escapeHTML(item.notes)}</p>` : ''}
                     <div class="d-flex gap-1 mt-2 pt-2 border-top border-secondary-subtle border-opacity-25">
-                        <button class="btn btn-outline-secondary btn-sm py-1 px-2 flex-grow-1" onclick="UI.showDetailModal('${item.id}')">Detalle</button>
+                        <button class="btn btn-outline-custom btn-sm py-1 px-2 flex-grow-1" onclick="UI.showDetailModal('${item.id}')">Detalle</button>
                         <button class="btn btn-indigo btn-sm py-1 px-2 text-white flex-grow-1" onclick="UI.openEditModal('${item.id}')">Editar</button>
                         <button class="btn btn-outline-success btn-sm py-1 px-2 flex-grow-1" onclick="UI.handleReactivate('${item.id}')">Reactivar</button>
                     </div>
@@ -554,7 +871,7 @@ const UI = {
             </div>
         `;
 
-        container.innerHTML = desktopHtml + mobileHtml;
+        container.innerHTML = toolbarHtml + desktopHtml + mobileHtml;
     },
 
     openCreateModalForSlot(slotTime) {
@@ -600,7 +917,9 @@ const UI = {
         const body = document.getElementById('detail-modal-body');
         const statusBadge = item.active 
             ? `<span class="badge-custom badge-emerald">Activo</span>`
-            : `<span class="badge-custom badge-rose">Desactivado (${item.deactivatedReason === 'expired' ? 'Vencido' : 'Manual'})</span>`;
+            : (item.deactivatedReason === 'expired'
+                ? `<span class="badge-custom badge-zinc">Finalizado / Vencido</span>`
+                : `<span class="badge-custom badge-rose">Desactivado Manual</span>`);
 
         body.innerHTML = `
             <div class="mb-3">

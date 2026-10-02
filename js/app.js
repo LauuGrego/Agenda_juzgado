@@ -77,6 +77,9 @@ const App = {
         document.getElementById('selected-date')?.addEventListener('change', (e) => {
             if (e.target.value) {
                 UI.currentDate = e.target.value;
+                if (UI.currentTab === 'list' || UI.currentTab === 'deactivated') {
+                    UI.listFilters.date = e.target.value;
+                }
                 UI.updateDateDisplay();
                 this.renderCurrent();
             }
@@ -86,6 +89,9 @@ const App = {
             const [y, m, d] = UI.currentDate.split('-').map(Number);
             const dt = new Date(y, m - 1, d - 1);
             UI.currentDate = AgendaLogic.getLocalDateString(dt);
+            if (UI.currentTab === 'list' || UI.currentTab === 'deactivated') {
+                UI.listFilters.date = UI.currentDate;
+            }
             UI.updateDateDisplay();
             this.renderCurrent();
         });
@@ -94,12 +100,18 @@ const App = {
             const [y, m, d] = UI.currentDate.split('-').map(Number);
             const dt = new Date(y, m - 1, d + 1);
             UI.currentDate = AgendaLogic.getLocalDateString(dt);
+            if (UI.currentTab === 'list' || UI.currentTab === 'deactivated') {
+                UI.listFilters.date = UI.currentDate;
+            }
             UI.updateDateDisplay();
             this.renderCurrent();
         });
 
         document.getElementById('btn-today')?.addEventListener('click', () => {
             UI.currentDate = AgendaLogic.getInitialDate();
+            if (UI.currentTab === 'list' || UI.currentTab === 'deactivated') {
+                UI.listFilters.date = UI.currentDate;
+            }
             UI.updateDateDisplay();
             this.renderCurrent();
         });
@@ -279,18 +291,33 @@ const App = {
             }
         });
 
+        const applyTheme = (theme) => {
+            document.documentElement.setAttribute('data-bs-theme', theme);
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('AGENDA_THEME', theme);
+
+            const sunIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+            const moonIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+
+            const themeBtn = document.getElementById('theme-toggle');
+            if (themeBtn) {
+                themeBtn.innerHTML = theme === 'light' ? moonIcon : sunIcon;
+                themeBtn.setAttribute('title', theme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro');
+            }
+            const mobileThemeBtn = document.getElementById('mobile-theme-toggle');
+            if (mobileThemeBtn) {
+                mobileThemeBtn.innerHTML = (theme === 'light' ? moonIcon : sunIcon) + `<span>${theme === 'light' ? 'Modo Oscuro' : 'Modo Claro'}</span>`;
+            }
+        };
+
         document.getElementById('theme-toggle')?.addEventListener('click', () => {
             const currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'dark';
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            
-            document.documentElement.setAttribute('data-bs-theme', newTheme);
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('AGENDA_THEME', newTheme);
+            applyTheme(newTheme);
         });
 
         const savedTheme = localStorage.getItem('AGENDA_THEME') || 'dark';
-        document.documentElement.setAttribute('data-bs-theme', savedTheme);
-        document.documentElement.setAttribute('data-theme', savedTheme);
+        applyTheme(savedTheme);
 
         // --- EVENTOS DE AUTENTICACIÓN Y BLOQUEO --- //
         const authForm = document.getElementById('auth-form');

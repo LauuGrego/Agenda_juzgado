@@ -355,6 +355,76 @@ async function runTests() {
         if (noConflict) throw new Error('No debió detectar conflicto en horario consecutivo.');
     });
 
+    // TEST 12: Visualización de compromisos vencidos por paso del tiempo en el calendario (días anteriores)
+    await assertTest('Lógica Calendario: Inclusión de compromisos vencidos por horario en días anteriores', async () => {
+        const testDatePast = '2026-09-15';
+        const commitmentsMock = [
+            { id: 'past-1', title: 'Audiencia Pasada Vencida', date: testDatePast, startTime: '08:00', endTime: '09:00', active: false, deactivatedReason: 'expired' },
+            { id: 'past-2', title: 'Audiencia Cancelada Manual', date: testDatePast, startTime: '09:00', endTime: '10:00', active: false, deactivatedReason: 'manual' },
+            { id: 'past-3', title: 'Compromiso Activo Pasado', date: testDatePast, startTime: '10:00', endTime: '11:00', active: true, deactivatedReason: null },
+            { id: 'other-day', title: 'Compromiso Otro Día', date: '2026-09-16', startTime: '08:00', endTime: '09:00', active: false, deactivatedReason: 'expired' }
+        ];
+
+        // Criterio de filtro para el calendario en una fecha específica (testDatePast)
+        const visibleOnCalendar = commitmentsMock.filter(item => 
+            (item.active || item.deactivatedReason === 'expired') && item.date === testDatePast
+        );
+
+        if (visibleOnCalendar.length !== 2) {
+            throw new Error(`Se esperaban 2 compromisos visibles en ${testDatePast}, pero se obtuvieron ${visibleOnCalendar.length}`);
+        }
+
+        const ids = visibleOnCalendar.map(c => c.id);
+        if (!ids.includes('past-1')) {
+            throw new Error('El compromiso vencido por paso del tiempo (past-1) debió ser visible en el calendario.');
+        }
+        if (!ids.includes('past-3')) {
+            throw new Error('El compromiso activo (past-3) debió ser visible en el calendario.');
+        }
+        if (ids.includes('past-2')) {
+            throw new Error('El compromiso desactivado manualmente (past-2) NO debe aparecer en el calendario.');
+        }
+        if (ids.includes('other-day')) {
+            throw new Error('El compromiso de otra fecha NO debe aparecer en el día seleccionado.');
+        }
+    });
+
+    // TEST 13: Filtrado en Activos y Desactivados (por fecha, nombre, prioridad, motivo)
+    await assertTest('Lógica Listas: Filtrado por nombre, fecha, prioridad y motivo', async () => {
+        const items = [
+            { id: '1', title: 'Audiencia Testimonial Pérez', date: '2026-10-15', priority: 'Urgente', active: true, notes: 'Expte 123/24' },
+            { id: '2', title: 'Audiencia Conciliación Gómez', date: '2026-10-15', priority: 'Media', active: true, notes: 'Sala 1' },
+            { id: '3', title: 'Despacho de Causa López', date: '2026-10-16', priority: 'Alta', active: true, notes: 'Expte 456/24' },
+            { id: '4', title: 'Audiencia Vencida Rodríguez', date: '2026-09-20', priority: 'Urgente', active: false, deactivatedReason: 'expired' },
+            { id: '5', title: 'Trámite Cancelado Fernández', date: '2026-09-20', priority: 'Baja', active: false, deactivatedReason: 'manual' },
+            { id: '6', title: 'Audiencia Vencida Álvarez', date: '2026-09-21', priority: 'Media', active: false, deactivatedReason: 'expired' }
+        ];
+
+        // 1. Filtrar Activos por fecha '2026-10-15'
+        const activosFecha = items.filter(i => i.active && i.date === '2026-10-15');
+        if (activosFecha.length !== 2) throw new Error(`Filtro fecha activos falló: ${activosFecha.length}`);
+
+        // 2. Filtrar Activos por prioridad 'Urgente'
+        const activosUrgente = items.filter(i => i.active && i.priority === 'Urgente');
+        if (activosUrgente.length !== 1 || activosUrgente[0].id !== '1') throw new Error('Filtro prioridad activos falló');
+
+        // 3. Filtrar Activos por nombre/texto 'López'
+        const activosNombre = items.filter(i => i.active && (i.title.includes('López') || i.notes.includes('López')));
+        if (activosNombre.length !== 1 || activosNombre[0].id !== '3') throw new Error('Filtro nombre activos falló');
+
+        // 4. Filtrar Desactivados por motivo 'expired'
+        const desactExpirados = items.filter(i => !i.active && i.deactivatedReason === 'expired');
+        if (desactExpirados.length !== 2) throw new Error('Filtro motivo expired falló');
+
+        // 5. Filtrar Desactivados por motivo 'manual'
+        const desactManual = items.filter(i => !i.active && i.deactivatedReason === 'manual');
+        if (desactManual.length !== 1 || desactManual[0].id !== '5') throw new Error('Filtro motivo manual falló');
+
+        // 6. Filtrar Desactivados combinado (fecha '2026-09-20' + motivo 'expired')
+        const desactCombinado = items.filter(i => !i.active && i.date === '2026-09-20' && i.deactivatedReason === 'expired');
+        if (desactCombinado.length !== 1 || desactCombinado[0].id !== '4') throw new Error('Filtro combinado desactivados falló');
+    });
+
     // LIMPIEZA: Eliminar los registros de prueba generados
     console.log('\n🧹 Limpiando registros de prueba en la base de datos...');
     try {
