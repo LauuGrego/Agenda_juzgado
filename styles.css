@@ -988,19 +988,36 @@ body {
     40%, 60% { transform: translate3d(6px, 0, 0); }
 }
 
-/* --- 15. BARRA DE FILTROS EN LISTAS (ACTIVOS / DESACTIVADOS) --- */
-.filter-toolbar {
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-custom);
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+/* --- 15. BARRA DE CONTROL Y FILTROS UNIFICADA EN CABECERA --- */
+#grid-controls-row,
+#list-controls-row {
+    transition: opacity 150ms ease-out;
 }
 
-.filter-toolbar .input-custom {
-    font-size: 0.82rem;
-    height: 32px;
+#list-controls-row .input-custom,
+#grid-controls-row .input-custom {
+    font-size: 0.8rem;
+    border-radius: 6px;
 }
 
-.filter-toolbar .input-group-text {
-    border-color: var(--border-custom);
+#unified-list-date {
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+#unified-list-priority,
+#unified-list-reason {
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+#unified-list-count {
+    font-size: 0.75rem;
+    letter-spacing: -0.01em;
+    user-select: none;
+}
+
+#btn-unified-reset-filters {
+    font-size: 0.75rem;
+    border-radius: 6px;
 }

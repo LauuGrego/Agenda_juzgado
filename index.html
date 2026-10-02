@@ -84,60 +84,130 @@
                 </div>
             </div>
 
-            <!-- FILA DE CONTROL DE AGENDA: FECHA, BÚSQUEDA Y BOTÓN NUEVO -->
-            <div class="row align-items-center g-2 mt-1 pt-2 border-top border-secondary-subtle border-opacity-25">
-                <!-- Navegación de Fecha + Botón Nuevo (Mobile) -->
-                <div class="col-12 col-md-auto">
-                    <div class="d-flex align-items-center justify-content-between gap-2">
-                        <div class="d-flex align-items-center gap-1">
-                            <button id="btn-prev-day" class="btn btn-outline-custom btn-sm p-1 px-2" title="Día Anterior">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="15 18 9 12 15 6"/></svg>
-                            </button>
-                            <input type="date" id="selected-date" class="form-control form-control-sm font-mono input-custom p-1 text-center" style="min-width: 130px; width: 135px;">
-                            <button id="btn-next-day" class="btn btn-outline-custom btn-sm p-1 px-2" title="Día Siguiente">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"/></svg>
-                            </button>
-                            <button id="btn-today" class="btn btn-outline-custom btn-sm py-1 px-2">Hoy</button>
+            <!-- FILA DE CONTROL DE AGENDA: CONTEXTUAL SEGÚN LA PESTAÑA ACTIVA -->
+            <div class="mt-1 pt-2 border-top border-secondary-subtle border-opacity-25">
+                
+                <!-- 1. BARRA PARA VISTA GRILLA -->
+                <div id="grid-controls-row" class="row align-items-center g-2">
+                    <!-- Navegación de Fecha + Botón Nuevo (Mobile) -->
+                    <div class="col-12 col-md-auto">
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <div class="d-flex align-items-center gap-1">
+                                <button id="btn-prev-day" class="btn btn-outline-custom btn-sm p-1 px-2" title="Día Anterior">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="15 18 9 12 15 6"/></svg>
+                                </button>
+                                <input type="date" id="selected-date" class="form-control form-control-sm font-mono input-custom p-1 text-center" style="min-width: 130px; width: 135px;">
+                                <button id="btn-next-day" class="btn btn-outline-custom btn-sm p-1 px-2" title="Día Siguiente">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"/></svg>
+                                </button>
+                                <button id="btn-today" class="btn btn-outline-custom btn-sm py-1 px-2">Hoy</button>
+                            </div>
+                            <div id="current-date-header" class="fw-semibold text-primary-custom small text-capitalize text-truncate d-none d-lg-block"></div>
+                            
+                            <!-- Botón Nuevo en Mobile -->
+                            <div class="d-md-none ms-auto">
+                                <button id="btn-new-commitment-mobile" class="btn btn-indigo btn-sm d-flex align-items-center gap-1 text-white text-nowrap px-2.5" onclick="document.getElementById('btn-new-commitment').click()">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    <span>Nuevo</span>
+                                </button>
+                            </div>
                         </div>
-                        <div id="current-date-header" class="fw-semibold text-primary-custom small text-capitalize text-truncate d-none d-lg-block"></div>
-                        
-                        <!-- Botón Nuevo en Mobile -->
-                        <div class="d-md-none ms-auto">
-                            <button id="btn-new-commitment-mobile" class="btn btn-indigo btn-sm d-flex align-items-center gap-1 text-white text-nowrap px-2.5" onclick="document.getElementById('btn-new-commitment').click()">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </div>
+
+                    <!-- Búsqueda en Grilla y Botón Nuevo (Desktop) -->
+                    <div class="col-12 col-md">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="input-group input-group-sm flex-grow-1">
+                                <span class="input-group-text input-group-icon px-2">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                </span>
+                                <input type="text" id="search-input" class="form-control input-custom" placeholder="Buscar en la grilla...">
+                                <span id="search-count" class="input-group-text font-mono small text-secondary-custom d-none px-2" style="font-size: 0.75rem;"></span>
+                                <button id="btn-search-prev" type="button" class="btn btn-outline-custom p-1 px-1.5 d-none" title="Anterior (Shift+Enter)">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+                                </button>
+                                <button id="btn-search-next" type="button" class="btn btn-outline-custom p-1 px-1.5 d-none" title="Siguiente (Enter)">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                                </button>
+                                <button id="btn-search-clear" type="button" class="btn btn-outline-custom p-1 px-1.5 d-none" title="Limpiar búsqueda (Esc)">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            </div>
+
+                            <!-- Botón Nuevo (Desktop) -->
+                            <button id="btn-new-commitment" class="btn btn-indigo btn-sm d-none d-md-flex align-items-center gap-1 text-white text-nowrap px-3">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                                 <span>Nuevo</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Búsqueda y Botón Nuevo (Desktop) -->
-                <div class="col-12 col-md">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="input-group input-group-sm flex-grow-1">
+                <!-- 2. BARRA DE FILTROS UNIFICADA PARA VISTAS ACTIVOS Y DESACTIVADOS -->
+                <div id="list-controls-row" class="row align-items-center g-2 d-none">
+                    <!-- Búsqueda unificada en listas -->
+                    <div class="col-12 col-md-4">
+                        <div class="input-group input-group-sm">
                             <span class="input-group-text input-group-icon px-2">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                             </span>
-                            <input type="text" id="search-input" class="form-control input-custom" placeholder="Buscar compromiso...">
-                            <span id="search-count" class="input-group-text font-mono small text-secondary-custom d-none px-2" style="font-size: 0.75rem;"></span>
-                            <button id="btn-search-prev" type="button" class="btn btn-outline-custom p-1 px-1.5 d-none" title="Anterior (Shift+Enter)">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
-                            </button>
-                            <button id="btn-search-next" type="button" class="btn btn-outline-custom p-1 px-1.5 d-none" title="Siguiente (Enter)">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-                            </button>
-                            <button id="btn-search-clear" type="button" class="btn btn-outline-custom p-1 px-1.5 d-none" title="Limpiar búsqueda (Esc)">
+                            <input type="text" id="unified-list-search" class="form-control input-custom" placeholder="Buscar por nombre, carátula, notas...">
+                            <button id="btn-unified-clear-search" type="button" class="btn btn-outline-custom p-1 px-1.5 d-none" title="Limpiar texto de búsqueda">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </button>
                         </div>
+                    </div>
 
-                        <!-- Botón Nuevo (Desktop) -->
-                        <button id="btn-new-commitment" class="btn btn-indigo btn-sm d-none d-md-flex align-items-center gap-1 text-white text-nowrap px-3">
+                    <!-- Filtros rápidos unificados: Fecha, Prioridad, Motivo, Contador y Reset -->
+                    <div class="col-12 col-md">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <!-- Filtro Fecha -->
+                            <div class="input-group input-group-sm flex-nowrap" style="max-width: 175px;">
+                                <span class="input-group-text input-group-icon px-2" title="Filtrar por fecha">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                </span>
+                                <input type="date" id="unified-list-date" class="form-control input-custom font-mono p-1" title="Filtrar por fecha">
+                                <button id="btn-unified-clear-date" type="button" class="btn btn-outline-custom p-1 px-1.5 d-none" title="Limpiar filtro de fecha">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                            </div>
+
+                            <!-- Filtro Prioridad -->
+                            <select id="unified-list-priority" class="form-select form-select-sm input-custom" style="max-width: 160px;" title="Filtrar por prioridad">
+                                <option value="all">Todas las prioridades</option>
+                                <option value="Urgente">Urgente</option>
+                                <option value="Alta">Alta</option>
+                                <option value="Media">Media</option>
+                                <option value="Baja">Baja</option>
+                            </select>
+
+                            <!-- Filtro Motivo (solo en pestaña Desactivados) -->
+                            <select id="unified-list-reason" class="form-select form-select-sm input-custom d-none" style="max-width: 180px;" title="Filtrar por motivo de desactivación">
+                                <option value="all">Todos los motivos</option>
+                                <option value="expired">Por vencimiento</option>
+                                <option value="manual">Desactivado manual</option>
+                            </select>
+
+                            <!-- Contador de Resultados -->
+                            <span id="unified-list-count" class="badge-custom badge-zinc font-mono small text-nowrap">0 registros</span>
+
+                            <!-- Botón Limpiar Filtros -->
+                            <button id="btn-unified-reset-filters" type="button" class="btn btn-outline-custom btn-sm py-0.5 px-2 text-rose-400 d-none align-items-center gap-1 small text-nowrap" title="Restablecer todos los filtros">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <span>Limpiar</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Botón Nuevo (Desktop en Activos) -->
+                    <div class="col-auto d-none d-md-block ms-auto" id="list-new-btn-container">
+                        <button class="btn btn-indigo btn-sm d-flex align-items-center gap-1 text-white text-nowrap px-3" onclick="document.getElementById('btn-new-commitment').click()">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                             <span>Nuevo</span>
                         </button>
                     </div>
                 </div>
+
             </div>
 
         </div>

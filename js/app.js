@@ -118,13 +118,56 @@ const App = {
 
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
-                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
                 const target = e.currentTarget;
-                target.classList.add('active');
+                const tabName = target.dataset.tab;
                 
-                UI.currentTab = target.dataset.tab;
+                document.querySelectorAll('.nav-tab').forEach(t => {
+                    t.classList.toggle('active', t.dataset.tab === tabName);
+                });
+                
+                UI.currentTab = tabName;
+                UI.updateHeaderControlsVisibility();
                 this.renderCurrent();
             });
+        });
+
+        // Controles Unificados de Filtrado para Activos y Desactivados
+        const unifiedSearchInput = document.getElementById('unified-list-search');
+        if (unifiedSearchInput) {
+            unifiedSearchInput.addEventListener('input', (e) => {
+                UI.setListFilter('search', e.target.value);
+            });
+
+            unifiedSearchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    UI.clearFilterField('search');
+                }
+            });
+        }
+
+        document.getElementById('btn-unified-clear-search')?.addEventListener('click', () => {
+            UI.clearFilterField('search');
+        });
+
+        document.getElementById('unified-list-date')?.addEventListener('change', (e) => {
+            UI.setListFilter('date', e.target.value);
+        });
+
+        document.getElementById('btn-unified-clear-date')?.addEventListener('click', () => {
+            UI.clearFilterField('date');
+        });
+
+        document.getElementById('unified-list-priority')?.addEventListener('change', (e) => {
+            UI.setListFilter('priority', e.target.value);
+        });
+
+        document.getElementById('unified-list-reason')?.addEventListener('change', (e) => {
+            UI.setListFilter('reason', e.target.value);
+        });
+
+        document.getElementById('btn-unified-reset-filters')?.addEventListener('click', () => {
+            UI.resetListFilters();
         });
 
         document.getElementById('btn-new-commitment')?.addEventListener('click', () => {

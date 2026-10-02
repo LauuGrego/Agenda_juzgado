@@ -18,19 +18,22 @@ const UI = {
         reason: 'all'
     },
 
-    setListFilter(field, value, focusTargetId = null) {
+    setListFilter(field, value) {
         this.listFilters[field] = value;
         if (field === 'search') {
             const headerSearch = document.getElementById('search-input');
             if (headerSearch && headerSearch.value !== value) {
                 headerSearch.value = value;
             }
+            const unifiedSearch = document.getElementById('unified-list-search');
+            if (unifiedSearch && unifiedSearch.value !== value) {
+                unifiedSearch.value = value;
+            }
+            this.searchState.query = (value || '').toLowerCase().trim();
         }
-        if (field === 'date' && value) {
-            this.currentDate = value;
-            this.updateDateDisplay();
+        if (typeof App !== 'undefined') {
+            App.renderCurrent();
         }
-        this.applyListFilterAndRender(focusTargetId);
     },
 
     clearFilterField(field) {
@@ -38,6 +41,18 @@ const UI = {
         if (field === 'search') {
             const headerSearch = document.getElementById('search-input');
             if (headerSearch) headerSearch.value = '';
+            const unifiedSearch = document.getElementById('unified-list-search');
+            if (unifiedSearch) unifiedSearch.value = '';
+            this.searchState.query = '';
+        } else if (field === 'date') {
+            const dateInput = document.getElementById('unified-list-date');
+            if (dateInput) dateInput.value = '';
+        } else if (field === 'priority') {
+            const prioSelect = document.getElementById('unified-list-priority');
+            if (prioSelect) prioSelect.value = 'all';
+        } else if (field === 'reason') {
+            const reasonSelect = document.getElementById('unified-list-reason');
+            if (reasonSelect) reasonSelect.value = 'all';
         }
         if (typeof App !== 'undefined') {
             App.renderCurrent();
@@ -53,6 +68,19 @@ const UI = {
         };
         const headerSearch = document.getElementById('search-input');
         if (headerSearch) headerSearch.value = '';
+        const unifiedSearch = document.getElementById('unified-list-search');
+        if (unifiedSearch) unifiedSearch.value = '';
+        const dateInput = document.getElementById('unified-list-date');
+        if (dateInput) dateInput.value = '';
+        const prioSelect = document.getElementById('unified-list-priority');
+        if (prioSelect) prioSelect.value = 'all';
+        const reasonSelect = document.getElementById('unified-list-reason');
+        if (reasonSelect) reasonSelect.value = 'all';
+
+        this.searchState = { query: '', matches: [], currentIndex: -1 };
+        const countEl = document.getElementById('search-count');
+        if (countEl) countEl.classList.add('d-none');
+
         if (typeof App !== 'undefined') {
             App.renderCurrent();
         }
@@ -67,24 +95,79 @@ const UI = {
         );
     },
 
-    applyListFilterAndRender(focusTargetId = null) {
-        const activeEl = document.activeElement;
-        const targetId = focusTargetId || (activeEl ? activeEl.id : null);
-        const selStart = (activeEl && typeof activeEl.selectionStart === 'number') ? activeEl.selectionStart : null;
-        const selEnd = (activeEl && typeof activeEl.selectionEnd === 'number') ? activeEl.selectionEnd : null;
+    updateHeaderControlsVisibility() {
+        const gridRow = document.getElementById('grid-controls-row');
+        const listRow = document.getElementById('list-controls-row');
+        const reasonSelect = document.getElementById('unified-list-reason');
+        const listSearch = document.getElementById('unified-list-search');
+        const listDate = document.getElementById('unified-list-date');
+        const listPrio = document.getElementById('unified-list-priority');
+        const listNewBtn = document.getElementById('list-new-btn-container');
 
-        if (typeof App !== 'undefined') {
-            App.renderCurrent();
+        if (!gridRow || !listRow) return;
+
+        if (this.currentTab === 'grid') {
+            gridRow.classList.remove('d-none');
+            listRow.classList.add('d-none');
+            const headerSearch = document.getElementById('search-input');
+            if (headerSearch && this.listFilters.search && headerSearch.value !== this.listFilters.search) {
+                headerSearch.value = this.listFilters.search;
+                this.updateSearch(this.listFilters.search);
+            }
+        } else {
+            gridRow.classList.add('d-none');
+            listRow.classList.remove('d-none');
+
+            if (this.currentTab === 'deactivated') {
+                if (reasonSelect) reasonSelect.classList.remove('d-none');
+                if (listSearch) listSearch.placeholder = 'Buscar en historial de desactivados...';
+                if (listNewBtn) listNewBtn.classList.add('d-none');
+            } else {
+                if (reasonSelect) reasonSelect.classList.add('d-none');
+                if (listSearch) listSearch.placeholder = 'Buscar por nombre, carátula, notas...';
+                if (listNewBtn) listNewBtn.classList.remove('d-none');
+            }
+
+            if (listSearch && listSearch.value !== this.listFilters.search) {
+                listSearch.value = this.listFilters.search;
+            }
+            if (listDate && listDate.value !== this.listFilters.date) {
+                listDate.value = this.listFilters.date;
+            }
+            if (listPrio && listPrio.value !== this.listFilters.priority) {
+                listPrio.value = this.listFilters.priority;
+            }
+            if (reasonSelect && reasonSelect.value !== this.listFilters.reason) {
+                reasonSelect.value = this.listFilters.reason;
+            }
+
+            this.updateUnifiedFilterBarUI();
+        }
+    },
+
+    updateUnifiedFilterBarUI(filteredCount, totalCount) {
+        const countBadge = document.getElementById('unified-list-count');
+        const resetBtn = document.getElementById('btn-unified-reset-filters');
+        const clearSearchBtn = document.getElementById('btn-unified-clear-search');
+        const clearDateBtn = document.getElementById('btn-unified-clear-date');
+
+        if (countBadge && typeof filteredCount === 'number' && typeof totalCount === 'number') {
+            const label = this.currentTab === 'deactivated' ? 'desactivados' : 'compromisos';
+            countBadge.textContent = `${filteredCount} de ${totalCount} ${label}`;
         }
 
-        if (targetId) {
-            const restored = document.getElementById(targetId);
-            if (restored) {
-                restored.focus();
-                if (selStart !== null && selEnd !== null && typeof restored.setSelectionRange === 'function') {
-                    try { restored.setSelectionRange(selStart, selEnd); } catch (e) {}
-                }
-            }
+        if (clearSearchBtn) {
+            clearSearchBtn.classList.toggle('d-none', !this.listFilters.search);
+        }
+
+        if (clearDateBtn) {
+            clearDateBtn.classList.toggle('d-none', !this.listFilters.date);
+        }
+
+        if (resetBtn) {
+            const hasFilters = this.hasActiveListFilters();
+            resetBtn.classList.toggle('d-none', !hasFilters);
+            resetBtn.classList.toggle('d-inline-flex', hasFilters);
         }
     },
 
@@ -213,6 +296,7 @@ const UI = {
     init() {
         this.updateDateDisplay();
         this.renderTimeSlotOptions();
+        this.updateHeaderControlsVisibility();
     },
 
     updateDateDisplay() {
@@ -251,6 +335,7 @@ const UI = {
     },
 
     render(commitments) {
+        this.updateHeaderControlsVisibility();
         const { updatedCommitments, countDeactivated } = AgendaLogic.evaluateAutomaticDeactivations(commitments);
         if (countDeactivated > 0) {
             const newlyExpired = updatedCommitments.filter(c => !c.active && c.deactivatedReason === 'expired');
@@ -480,70 +565,9 @@ const UI = {
             return true;
         });
 
+        this.updateUnifiedFilterBarUI(filtered.length, totalCount);
+
         const hasActiveFilters = this.hasActiveListFilters();
-
-        const toolbarHtml = `
-            <div class="filter-toolbar card bg-surface border-secondary-subtle p-2.5 rounded-3 mb-3 shadow-sm">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pb-2 border-bottom border-secondary-subtle border-opacity-25">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="small fw-semibold text-primary-custom d-flex align-items-center gap-1.5">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-                            Filtros de Búsqueda
-                        </span>
-                        <span class="badge-custom badge-zinc font-mono small">${filtered.length} de ${totalCount} compromisos</span>
-                    </div>
-                    ${hasActiveFilters ? `
-                        <button class="btn btn-outline-custom btn-sm py-0.5 px-2 text-rose-400 d-flex align-items-center gap-1 small" onclick="UI.resetListFilters()" title="Restablecer todos los filtros">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                            <span>Limpiar filtros</span>
-                        </button>
-                    ` : ''}
-                </div>
-
-                <div class="row g-2 align-items-center">
-                    <!-- Búsqueda por Nombre / Título / Notas -->
-                    <div class="col-12 col-md-5">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text input-group-icon px-2">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            </span>
-                            <input type="text" id="filter-search-active" class="form-control input-custom" placeholder="Buscar por nombre, carátula, notas..." value="${Security.escapeHTML(this.listFilters.search)}" oninput="UI.setListFilter('search', this.value, 'filter-search-active')">
-                            ${this.listFilters.search ? `
-                                <button class="btn btn-outline-custom p-1 px-1.5" onclick="UI.clearFilterField('search')" title="Limpiar texto">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
-
-                    <!-- Filtro por Fecha -->
-                    <div class="col-12 col-sm-6 col-md-4">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text input-group-icon px-2" title="Filtrar por fecha">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                            </span>
-                            <input type="date" id="filter-date-active" class="form-control input-custom font-mono" value="${Security.escapeHTML(this.listFilters.date)}" onchange="UI.setListFilter('date', this.value)">
-                            ${this.listFilters.date ? `
-                                <button class="btn btn-outline-custom p-1 px-1.5" onclick="UI.clearFilterField('date')" title="Ver todas las fechas">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
-
-                    <!-- Filtro por Prioridad -->
-                    <div class="col-12 col-sm-6 col-md-3">
-                        <select id="filter-priority-active" class="form-select form-select-sm input-custom" onchange="UI.setListFilter('priority', this.value)">
-                            <option value="all" ${this.listFilters.priority === 'all' ? 'selected' : ''}>Todas las prioridades</option>
-                            <option value="Urgente" ${this.listFilters.priority === 'Urgente' ? 'selected' : ''}>Urgente</option>
-                            <option value="Alta" ${this.listFilters.priority === 'Alta' ? 'selected' : ''}>Alta</option>
-                            <option value="Media" ${this.listFilters.priority === 'Media' ? 'selected' : ''}>Media</option>
-                            <option value="Baja" ${this.listFilters.priority === 'Baja' ? 'selected' : ''}>Baja</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        `;
 
         if (filtered.length === 0) {
             const emptyMsg = hasActiveFilters
@@ -566,7 +590,7 @@ const UI = {
                         <p class="small mb-0">No hay compromisos activos programados en el sistema.</p>
                     </div>
                 `;
-            container.innerHTML = toolbarHtml + emptyMsg;
+            container.innerHTML = emptyMsg;
             return;
         }
 
@@ -648,7 +672,7 @@ const UI = {
             </div>
         `;
 
-        container.innerHTML = toolbarHtml + desktopHtml + mobileHtml;
+        container.innerHTML = desktopHtml + mobileHtml;
     },
 
     renderDeactivatedList(commitments) {
@@ -684,79 +708,9 @@ const UI = {
             return true;
         });
 
+        this.updateUnifiedFilterBarUI(filtered.length, totalCount);
+
         const hasActiveFilters = this.hasActiveListFilters();
-
-        const toolbarHtml = `
-            <div class="filter-toolbar card bg-surface border-secondary-subtle p-2.5 rounded-3 mb-3 shadow-sm">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2 pb-2 border-bottom border-secondary-subtle border-opacity-25">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="small fw-semibold text-primary-custom d-flex align-items-center gap-1.5">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-                            Filtros de Búsqueda
-                        </span>
-                        <span class="badge-custom badge-zinc font-mono small">${filtered.length} de ${totalCount} registros</span>
-                    </div>
-                    ${hasActiveFilters ? `
-                        <button class="btn btn-outline-custom btn-sm py-0.5 px-2 text-rose-400 d-flex align-items-center gap-1 small" onclick="UI.resetListFilters()" title="Restablecer todos los filtros">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                            <span>Limpiar filtros</span>
-                        </button>
-                    ` : ''}
-                </div>
-
-                <div class="row g-2 align-items-center">
-                    <!-- Búsqueda por Nombre / Título / Notas -->
-                    <div class="col-12 col-md-4">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text input-group-icon px-2">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            </span>
-                            <input type="text" id="filter-search-deactivated" class="form-control input-custom" placeholder="Buscar por nombre, carátula, notas..." value="${Security.escapeHTML(this.listFilters.search)}" oninput="UI.setListFilter('search', this.value, 'filter-search-deactivated')">
-                            ${this.listFilters.search ? `
-                                <button class="btn btn-outline-custom p-1 px-1.5" onclick="UI.clearFilterField('search')" title="Limpiar texto">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
-
-                    <!-- Filtro por Fecha -->
-                    <div class="col-12 col-sm-6 col-md-3">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text input-group-icon px-2" title="Filtrar por fecha">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                            </span>
-                            <input type="date" id="filter-date-deactivated" class="form-control input-custom font-mono" value="${Security.escapeHTML(this.listFilters.date)}" onchange="UI.setListFilter('date', this.value)">
-                            ${this.listFilters.date ? `
-                                <button class="btn btn-outline-custom p-1 px-1.5" onclick="UI.clearFilterField('date')" title="Ver todas las fechas">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
-
-                    <!-- Filtro por Motivo de Desactivación -->
-                    <div class="col-12 col-sm-6 col-md-3">
-                        <select id="filter-reason-deactivated" class="form-select form-select-sm input-custom" onchange="UI.setListFilter('reason', this.value)">
-                            <option value="all" ${this.listFilters.reason === 'all' ? 'selected' : ''}>Todos los motivos</option>
-                            <option value="expired" ${this.listFilters.reason === 'expired' ? 'selected' : ''}>Vencimiento de horario</option>
-                            <option value="manual" ${this.listFilters.reason === 'manual' ? 'selected' : ''}>Desactivación manual</option>
-                        </select>
-                    </div>
-
-                    <!-- Filtro por Prioridad -->
-                    <div class="col-12 col-md-2">
-                        <select id="filter-priority-deactivated" class="form-select form-select-sm input-custom" onchange="UI.setListFilter('priority', this.value)">
-                            <option value="all" ${this.listFilters.priority === 'all' ? 'selected' : ''}>Todas prioridades</option>
-                            <option value="Urgente" ${this.listFilters.priority === 'Urgente' ? 'selected' : ''}>Urgente</option>
-                            <option value="Alta" ${this.listFilters.priority === 'Alta' ? 'selected' : ''}>Alta</option>
-                            <option value="Media" ${this.listFilters.priority === 'Media' ? 'selected' : ''}>Media</option>
-                            <option value="Baja" ${this.listFilters.priority === 'Baja' ? 'selected' : ''}>Baja</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        `;
 
         if (filtered.length === 0) {
             const emptyMsg = hasActiveFilters
@@ -779,7 +733,7 @@ const UI = {
                         <p class="small mb-0">Los compromisos desactivados manualmente o por vencimiento aparecerán aquí.</p>
                     </div>
                 `;
-            container.innerHTML = toolbarHtml + emptyMsg;
+            container.innerHTML = emptyMsg;
             return;
         }
 
@@ -871,7 +825,7 @@ const UI = {
             </div>
         `;
 
-        container.innerHTML = toolbarHtml + desktopHtml + mobileHtml;
+        container.innerHTML = desktopHtml + mobileHtml;
     },
 
     openCreateModalForSlot(slotTime) {
