@@ -6,20 +6,6 @@ require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// Cliente de base de datos de respaldo secundaria (opcional en Railway)
-const backupPrisma = process.env.BACKUP_DATABASE_URL 
-    ? new PrismaClient({ datasources: { db: { url: process.env.BACKUP_DATABASE_URL } } }) 
-    : null;
-
-async function mirrorToBackup(fn) {
-    if (!backupPrisma) return;
-    try {
-        await fn(backupPrisma);
-    } catch (err) {
-        console.warn('⚠️ [Aviso de Respaldo] No se pudo replicar a la base de datos de respaldo:', err.message);
-    }
-}
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -50,7 +36,6 @@ app.get('/api/health', async (req, res) => {
             status: 'ok', 
             connected: true, 
             provider: isSupabase ? 'supabase' : 'local-postgres',
-            hasBackup: Boolean(backupPrisma),
             message: isSupabase 
                 ? 'Conectado a Supabase (PostgreSQL Cloud)' 
                 : 'Conectado a PostgreSQL Local (Docker)'
@@ -113,22 +98,6 @@ app.post('/api/commitments', async (req, res) => {
             }
         });
 
-        // Replicación asíncrona a la base de respaldo
-        mirrorToBackup(bp => bp.commitment.create({
-            data: {
-                id: newCommitment.id,
-                title: newCommitment.title,
-                date: newCommitment.date,
-                startTime: newCommitment.startTime,
-                endTime: newCommitment.endTime,
-                priority: newCommitment.priority,
-                notes: newCommitment.notes,
-                active: newCommitment.active,
-                deactivatedReason: newCommitment.deactivatedReason,
-                deactivatedAt: newCommitment.deactivatedAt
-            }
-        }));
-
         return res.status(201).json(newCommitment);
     } catch (error) {
         console.error('Error al crear compromiso:', error);
@@ -159,12 +128,6 @@ app.put('/api/commitments/:id', async (req, res) => {
             data: updateData
         });
 
-        // Replicación asíncrona a la base de respaldo
-        mirrorToBackup(bp => bp.commitment.update({
-            where: { id },
-            data: updateData
-        }));
-
         return res.json(updated);
     } catch (error) {
         console.error(`Error al actualizar compromiso ${id}:`, error);
@@ -187,16 +150,6 @@ app.patch('/api/commitments/:id/deactivate', async (req, res) => {
             }
         });
 
-        // Replicación asíncrona a la base de respaldo
-        mirrorToBackup(bp => bp.commitment.update({
-            where: { id },
-            data: {
-                active: false,
-                deactivatedReason: reason,
-                deactivatedAt: new Date()
-            }
-        }));
-
         return res.json(deactivated);
     } catch (error) {
         console.error(`Error al desactivar compromiso ${id}:`, error);
@@ -217,16 +170,6 @@ app.patch('/api/commitments/:id/reactivate', async (req, res) => {
                 deactivatedAt: null
             }
         });
-
-        // Replicación asíncrona a la base de respaldo
-        mirrorToBackup(bp => bp.commitment.update({
-            where: { id },
-            data: {
-                active: true,
-                deactivatedReason: null,
-                deactivatedAt: null
-            }
-        }));
 
         return res.json(reactivated);
     } catch (error) {
@@ -254,12 +197,6 @@ app.post('/api/commitments/sync-expired', async (req, res) => {
                 deactivatedAt: new Date()
             }
         });
-
-        // Replicación asíncrona a la base de respaldo
-        mirrorToBackup(bp => bp.commitment.updateMany({
-            where: { id: { in: expiredIds }, active: true },
-            data: { active: false, deactivatedReason: 'expired', deactivatedAt: new Date() }
-        }));
 
         return res.json({ updated: result.count });
     } catch (error) {
@@ -296,29 +233,6 @@ app.post('/api/commitments/import', async (req, res) => {
                         }
                     });
                 }
-            });
-
-            // Replicación de reemplazo a la base de respaldo
-            mirrorToBackup(async (bp) => {
-                await bp.$transaction(async (tx) => {
-                    await tx.commitment.deleteMany({});
-                    for (const item of items) {
-                        await tx.commitment.create({
-                            data: {
-                                id: item.id,
-                                title: item.title,
-                                date: item.date,
-                                startTime: item.startTime,
-                                endTime: item.endTime,
-                                priority: item.priority || 'Media',
-                                notes: item.notes || '',
-                                active: item.active !== undefined ? Boolean(item.active) : true,
-                                deactivatedReason: item.deactivatedReason || null,
-                                deactivatedAt: item.deactivatedAt ? new Date(item.deactivatedAt) : null
-                            }
-                        });
-                    }
-                });
             });
 
             return res.json({ success: true, mode: 'replace', count: items.length });
@@ -366,18 +280,6 @@ app.post('/api/commitments/import', async (req, res) => {
                 }
             });
 
-            // Replicación de merge a la base de respaldo
-            mirrorToBackup(async (bp) => {
-                for (const item of items) {
-                    const existing = await bp.commitment.findUnique({ where: { id: item.id } });
-                    if (existing) {
-                        await bp.commitment.update({ where: { id: item.id }, data: item });
-                    } else {
-                        await bp.commitment.create({ data: item });
-                    }
-                }
-            });
-
             return res.json({ success: true, mode: 'merge', count: items.length, added, updated });
         }
     } catch (error) {
@@ -400,8 +302,5 @@ app.listen(PORT, () => {
     console.log(`🚀 Agenda Juzgado iniciada en el puerto ${PORT}`);
     console.log(`🌐 Acceso local: http://localhost:${PORT}`);
     console.log(`🔌 Base de datos activa: ${dbTarget}`);
-    if (backupPrisma) {
-        console.log(`🛡️ Réplica de respaldo activa en Railway PostgreSQL`);
-    }
     console.log(`=========================================`);
 });
